@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
@@ -13,7 +14,8 @@ PlasmoidItem {
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     preferredRepresentation: panel ? compactRepresentation : fullRepresentation
     toolTipMainText: "Luma Ribbon"
-    toolTipSubText: qsTr("Light that follows your audio. Click to expand.")
+    toolTipSubText: panel ? qsTr("Light that follows your audio. Click to expand.")
+        : qsTr("Light that follows your audio.")
 
     component ConfiguredRibbon: RibbonView {
         audio: root.audio

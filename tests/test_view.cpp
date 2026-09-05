@@ -478,6 +478,8 @@ private Q_SLOTS:
         view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
         QCOMPARE(view.status(), QQuickView::Ready);
+        if (view.rootObject()->property("fallback").toBool() && !view.rootObject()->property("shaderFailed").toBool())
+            QSKIP("The scene graph silently fell back to software; no travelling attack ripple.");
         view.resize(640, 190);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -521,6 +523,8 @@ private Q_SLOTS:
         view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
         QCOMPARE(view.status(), QQuickView::Ready);
+        if (view.rootObject()->property("fallback").toBool() && !view.rootObject()->property("shaderFailed").toBool())
+            QSKIP("The scene graph silently fell back to software; no travelling attack ripple.");
         view.resize(200, 40);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
