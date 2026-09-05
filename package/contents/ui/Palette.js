@@ -23,7 +23,8 @@ function colors(index, light) {
 }
 
 // Fraction of the ramp that audio-reactive color may span. Light-theme Ice
-// keeps 20% so small timbre changes stay legible in the simple renderer.
+// keeps a narrow spread so small timbre changes stay legible in the simple
+// renderer.
 function spreadLimit(index, light) {
     return index === 2 && light ? 0.08 : 0.5;
 }
