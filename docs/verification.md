@@ -1,5 +1,7 @@
 # Verification record
 
+The [PR 1 review](pr-1-review.md) records the 2026-09-06 hardening checks and added exception/motion regressions. Its complete suite passes 10/10; the records below describe earlier passes.
+
 Date: 2026-09-05. Environment: CachyOS, Wayland, Plasma 6.7.4, Qt 6.11.2, PipeWire 1.6.8, FFTW 3.3.11, GCC 16.2.1, CMake 4.4.3.
 
 ## Executed

@@ -9,11 +9,14 @@
 #include <stdexcept>
 
 extern "C" void luma_fail_next_fftw_plan();
+extern "C" void luma_throw_next_fftw_plan();
 
 int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
     using namespace std::chrono;
-    luma_fail_next_fftw_plan();
+    const bool unexpected = app.arguments().contains(QStringLiteral("--unexpected"));
+    const auto injectFailure = unexpected ? luma_throw_next_fftw_plan : luma_fail_next_fftw_plan;
+    injectFailure();
     auto engine = Luma::AudioEngine::acquire();
     const auto await = [&](auto predicate, seconds timeout) {
         const auto deadline = steady_clock::now() + timeout;
@@ -23,13 +26,16 @@ int main(int argc, char **argv) {
         } while (steady_clock::now() < deadline);
         return false;
     };
-    const auto failed = [](const auto &snapshot) { return snapshot.status.message.contains("Could not initialize FFTW"); };
+    const auto failed = [unexpected](const auto &snapshot) {
+        return snapshot.status.error && snapshot.status.message.contains(unexpected
+            ? "Audio analysis failed unexpectedly" : "Could not initialize FFTW");
+    };
     if (!await(failed, seconds(2))) { std::cerr << "Injected initialization failure was not reported\n"; return 1; }
     if (!await([&](const auto &s) { return !s.status.message.isEmpty() && !failed(s); }, seconds(7))) {
         std::cerr << "Analysis did not recover automatically\n"; return 1;
     }
     engine.reset();
-    luma_fail_next_fftw_plan();
+    injectFailure();
     engine = Luma::AudioEngine::acquire();
     if (!await(failed, seconds(2))) { std::cerr << "Second injected failure was not reported\n"; return 1; }
     const auto removal = steady_clock::now();
