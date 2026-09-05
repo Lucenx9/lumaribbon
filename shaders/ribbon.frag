@@ -28,6 +28,8 @@ void main() {
     float x = uv.x;
     float quiet = smoothstep(0.001, 0.13, bands.x);
     float edge = smoothstep(0.0, 0.095, x) * smoothstep(0.0, 0.095, 1.0 - x);
+    // Let faint halo tails dissolve before the panel clips them at high sensitivity.
+    float verticalEdge = smoothstep(0.0, 0.065, uv.y) * smoothstep(0.0, 0.065, 1.0 - uv.y);
     float envelope = pow(max(sin(x * 3.141593), 0.0), 0.72);
     float reduced = motion.w;
     // Keep time coefficients in integer hundredths: the engine wraps at 200*pi.
@@ -51,7 +53,7 @@ void main() {
     float ripple = sin(wavefront * 48.0) * gaussian(wavefront, 0.14)
                  * motion.y * 0.032 * (1.0 - reduced);
     float center = 0.51 + body * bend + continuity + midAccentBend + ripple;
-    float thickness = 0.025 + 0.06 * bands.y + 0.014 * accents.x;
+    float thickness = 0.032 + 0.055 * bands.y + 0.014 * accents.x;
     float pixel = 1.0 / max(resolution.y, 1.0);
     // Narrow the bundle as well as fading it, so the ends never form a blunt cap.
     float taper = mix(0.48, 1.0, smoothstep(0.0, 0.16, x) * (1.0 - smoothstep(0.82, 1.0, x)));
@@ -63,23 +65,25 @@ void main() {
     for (int i = 0; i < 5; ++i) {
         float f = float(i) - 2.0;
         float drift = sin(x * (7.0 + float(i) * 0.38) + t * (0.55 + float(i) * 0.09) + f * 0.8);
-        float fold = f * thickness * (0.22 + 0.78 * form.w)
-            * (0.24 + 0.76 * sin(u * 3.141593 + f * 0.18 + form.y * 0.35));
+        float fold = f * thickness * (0.32 + 0.88 * form.w)
+            * (0.24 + 0.76 * sin(u * 3.141593 + f * 0.32 + form.y * 0.35));
         strands[i] = center + (fold + drift * (0.012 + bands.z * 0.012) * envelope
             + bands.w * 0.004 * sin(x * 37.0 + f * 2.0 - t) * (1.0 - reduced)) * taper;
         veilCenter += strands[i] * filamentWeight(f);
         totalWeight += filamentWeight(f);
     }
 
-    // Anchor the veil to the actual bundle and share its longitudinal color.
+    // Center the weighted bundle on the audio curve. Asymmetric folds must not
+    // shift the whole bundle in the opposite direction and flatten that curve.
+    float bundleOffset = veilCenter / totalWeight - center;
     vec3 ribbonColor = mix(colorA.rgb, colorB.rgb, smoothstep(0.08, 0.92, x));
-    float veil = gaussian(uv.y - veilCenter / totalWeight, (thickness * 1.8 + pixel) * taper);
+    float veil = gaussian(uv.y - center, (thickness * 1.8 + pixel) * taper);
     sum += veil * ribbonColor * 0.18;
     density += veil * 0.18;
 
     for (int i = 0; i < 5; ++i) {
         float f = float(i) - 2.0;
-        float distance = uv.y - strands[i];
+        float distance = uv.y - (strands[i] - bundleOffset);
         float coreWidth = max(pixel * 0.5, (0.004 + 0.003 * bands.y) * (1.0 - 0.08 * abs(f)) * taper);
         float core = gaussian(distance, coreWidth);
         float halo = gaussian(distance, (thickness * 0.62 + pixel) * taper);
@@ -90,6 +94,7 @@ void main() {
         density += light;
     }
     float coverage = quiet * edge * (0.35 + 0.65 * sqrt(bands.x)) * intensity;
+    coverage = clamp(coverage, 0.0, 1.0) * verticalEdge;
     float alpha = (1.0 - exp(-density * 1.65)) * clamp(coverage, 0.0, 1.0);
     vec3 rgb = sum / max(density, 0.001);
     // ShaderEffect requires premultiplied output, including qt_Opacity.

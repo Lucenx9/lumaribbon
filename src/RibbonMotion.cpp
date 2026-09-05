@@ -24,11 +24,14 @@ RibbonShape RibbonMotion::advance(const Features &f, float seconds) {
     const float presence = std::clamp(f.energy / 0.24f, 0.0f, 1.0f);
     const float swell = std::clamp((f.energy - slowEnergy) * 2, -0.5f, 0.5f);
     const float phrase = std::clamp((f.mid - slowMid) * 3, -0.65f, 0.65f);
+    // Opposing bands can cancel the arch in a full mix. Let their coexistence
+    // open a counter-bend instead: zero for one band, strongest in a balanced mix.
+    const float blend = 3.0f * (low * mid + mid * high + high * low);
     const std::array<float, 4> target{
         presence * (0.9f * low - 0.2f * mid - 0.75f * high + 0.24f * swell),
-        presence * (0.22f + 0.85f * mid - 0.25f * low - 0.5f * high + 0.3f * phrase),
+        presence * (0.22f + 0.85f * mid - 0.25f * low - 0.5f * high + 0.8f * blend + 0.3f * phrase),
         presence * (0.65f * (high - low) + 0.35f * phrase),
-        std::clamp(0.22f + 0.65f * low + 0.22f * mid + 0.2f * swell, 0.15f, 1.0f)
+        std::clamp(0.38f + 0.5f * low + 0.24f * mid + 0.14f * blend + 0.2f * swell, 0.15f, 1.0f)
     };
     constexpr std::array<float, 4> frequency{9, 7, 6, 8};
     for (unsigned i = 0; i < value.size(); ++i) {

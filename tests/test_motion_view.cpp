@@ -8,7 +8,11 @@
 #include <QTransform>
 #include <QVariantMap>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <numbers>
+#include "SignalAnalyzer.h"
+#include "RibbonMotion.h"
 
 class FrameAudio : public QObject {
     Q_OBJECT
@@ -19,6 +23,30 @@ public:
 };
 
 namespace {
+QVariantMap analyzedMix(bool includeMids) {
+    Luma::SignalAnalyzer analyzer;
+    Luma::RibbonMotion motion;
+    Luma::RibbonShape shape;
+    std::array<Luma::StereoFrame, 480> block;
+    unsigned index = 0;
+    for (unsigned tick = 0; tick < 600; ++tick) {
+        for (auto &frame : block) {
+            const double t = double(index++) / 48000;
+            const float sample = 0.10 * std::sin(2 * std::numbers::pi * 94 * t)
+                + (includeMids ? 0.08 : 0.0) * std::sin(2 * std::numbers::pi * 740 * t)
+                + 0.10 * std::sin(2 * std::numbers::pi * 4800 * t);
+            frame = {sample, -sample};
+        }
+        analyzer.feed(block, 48000);
+        shape = motion.advance(analyzer.features(), 0.01f);
+    }
+    const auto f = analyzer.features();
+    return {{"energy", f.energy}, {"bass", f.bass}, {"mid", f.mid}, {"treble", f.treble},
+        {"phase", 0.65}, {"onset", 0.0}, {"rippleAge", 10.0}, {"rippleOrigin", 0.5},
+        {"bassAccent", 0.0}, {"midAccent", 0.0}, {"trebleAccent", 0.0},
+        {"arch", shape.arch}, {"counterBend", shape.counterBend}, {"bias", shape.bias}, {"opening", shape.opening}};
+}
+
 QVariantMap restingFrame() {
     // Hold the slow shape, levels, color and shared ripple fixed. Only a band's
     // independent transient can change the captured image in these fixtures.
@@ -66,6 +94,61 @@ double center(const QImage &image, int x) {
 class MotionViewTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void mixedBandBody_data() {
+        QTest::addColumn<bool>("fallback");
+        QTest::addColumn<bool>("includeMids");
+        QTest::addColumn<QSize>("size");
+        QTest::addColumn<double>("gain");
+        for (bool fallback : {false, true})
+            for (bool includeMids : {false, true})
+                for (const auto &size : {QSize(160, 32), QSize(200, 40), QSize(240, 48), QSize(40, 200)})
+                    for (double gain : {1.0, 1.5})
+                        QTest::newRow(qPrintable(QString("%1-%2-%3x%4-gain%5").arg(fallback ? "canvas" : "shader")
+                            .arg(includeMids ? "full-mix" : "bass-highs").arg(size.width()).arg(size.height()).arg(gain)))
+                            << fallback << includeMids << size << gain;
+    }
+    void mixedBandBody() {
+        QFETCH(bool, fallback);
+        QFETCH(bool, includeMids);
+        QFETCH(QSize, size);
+        QFETCH(double, gain);
+        FrameAudio audio;
+        audio.current = analyzedMix(includeMids);
+        // Sensitivity scales levels after analysis; the shared shape is unchanged.
+        for (const auto *key : {"energy", "bass", "mid", "treble"})
+            audio.current[key] = std::min(1.0, audio.current[key].toDouble() * gain);
+        QQuickView view;
+        view.setColor(Qt::transparent);
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        const bool vertical = size.height() > size.width();
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"forceFallback", fallback}, {"dynamicColor", false}, {"paletteIndex", 1}, {"vertical", vertical},
+            {"intensity", gain}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        view.resize(size);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto image = capture(view, audio.current);
+        QVERIFY(!image.isNull());
+        QVERIFY(!view.rootObject()->property("shaderFailed").toBool());
+        if (vertical) image = image.transformed(QTransform().rotate(90));
+        double low = image.height(), high = 0;
+        for (int x = image.width() / 8; x < image.width() * 7 / 8; ++x) {
+            low = std::min(low, center(image, x));
+            high = std::max(high, center(image, x));
+        }
+        const double excursion = (high - low) / image.height();
+        qInfo() << "Mixed-band vertical excursion" << excursion << "shape"
+            << audio.current["arch"] << audio.current["counterBend"] << audio.current["opening"];
+        QVERIFY2(excursion > 0.12, "An audible multi-band mix must retain a readable broad curve at panel size.");
+        QVERIFY2(excursion < 0.42, "The broad curve must leave room for filaments and attacks.");
+        for (int x = 0; x < image.width(); ++x) {
+            QVERIFY2(image.pixelColor(x, 0).alpha() < 3, "The upper halo must fade before the panel clips it.");
+            QVERIFY2(image.pixelColor(x, image.height() - 1).alpha() < 3, "The lower halo must fade before the panel clips it.");
+        }
+    }
+
     void sharedShape_data() {
         QTest::addColumn<bool>("fallback");
         QTest::newRow("shader") << false;
