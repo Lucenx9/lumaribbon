@@ -14,6 +14,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 colorA;
     vec4 colorB;
     vec4 colorC;
+    vec2 appearance; // per-view curvature and fullness; both default to 1
 };
 
 float gaussian(float distance, float width) {
@@ -29,7 +30,9 @@ void main() {
     float quiet = smoothstep(0.001, 0.13, bands.x);
     float edge = smoothstep(0.0, 0.095, x) * smoothstep(0.0, 0.095, 1.0 - x);
     // Let faint halo tails dissolve before the panel clips them at high sensitivity.
-    float verticalEdge = smoothstep(0.0, 0.065, uv.y) * smoothstep(0.0, 0.065, 1.0 - uv.y);
+    float border = 1.0 / max(resolution.y, 1.0);
+    float verticalEdge = smoothstep(border, max(0.065, border * 2.0), uv.y)
+        * smoothstep(border, max(0.065, border * 2.0), 1.0 - uv.y);
     float envelope = pow(max(sin(x * 3.141593), 0.0), 0.72);
     float reduced = motion.w;
     // Keep time coefficients in integer hundredths: the engine wraps at 200*pi.
@@ -40,7 +43,7 @@ void main() {
     float u = x + form.z * 0.65 * x * (1.0 - x);
     float arch = 4.0 * u * (1.0 - u);
     float counterBend = 2.5 * arch * (2.0 * u - 1.0);
-    float body = (0.13 + 0.065 * bands.x + 0.02 * bands.y) * mix(1.0, 0.35, reduced);
+    float body = (0.13 + 0.065 * bands.x + 0.02 * bands.y) * mix(1.0, 0.35, reduced) * appearance.x;
     float bend = -form.x * arch + form.y * counterBend;
     // Keep fast mid attacks independent of the slow shape and shared ripple.
     // Match the Canvas expression. Peak displacement is < 0.024 of the height.
@@ -53,7 +56,7 @@ void main() {
     float ripple = sin(wavefront * 48.0) * gaussian(wavefront, 0.14)
                  * motion.y * 0.032 * (1.0 - reduced);
     float center = 0.51 + body * bend + continuity + midAccentBend + ripple;
-    float thickness = 0.032 + 0.055 * bands.y + 0.014 * accents.x;
+    float thickness = (0.032 + 0.055 * bands.y + 0.014 * accents.x) * appearance.y;
     float pixel = 1.0 / max(resolution.y, 1.0);
     // Narrow the bundle as well as fading it, so the ends never form a blunt cap.
     float taper = mix(0.48, 1.0, smoothstep(0.0, 0.16, x) * (1.0 - smoothstep(0.82, 1.0, x)));
@@ -84,7 +87,7 @@ void main() {
     for (int i = 0; i < 5; ++i) {
         float f = float(i) - 2.0;
         float distance = uv.y - (strands[i] - bundleOffset);
-        float coreWidth = max(pixel * 0.5, (0.004 + 0.003 * bands.y) * (1.0 - 0.08 * abs(f)) * taper);
+        float coreWidth = max(pixel * 0.5, (0.004 + 0.003 * bands.y) * appearance.y * (1.0 - 0.08 * abs(f)) * taper);
         float core = gaussian(distance, coreWidth);
         float halo = gaussian(distance, (thickness * 0.62 + pixel) * taper);
         float glint = accents.z * pow(0.5 + 0.5 * sin(x * 18.0 + f * 1.7 - t), 4.0);

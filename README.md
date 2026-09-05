@@ -21,9 +21,9 @@ Click the panel ribbon to open an enlarged view. Multiple instances in one Plasm
 
 ## Validation status
 
-The latest integration passes all **nine CTest suites**. Rendering checks also pass at 125% scaling and with the software backend. Motion, audio-state lifecycle and initialization recovery pass with AddressSanitizer and UndefinedBehaviorSanitizer. See the [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) for scope and results.
+See the [appearance controls verification](docs/appearance-controls.md) for the current settings and rendering checks, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
 
-The newest motion integration still needs a playing-song listening assessment and prolonged use in the actual panel. Its latest live probe connected successfully but received silence. Hardware hot-plug, physical Bluetooth timing and mixed-monitor scaling remain open checks. Historical reports describe earlier versions and must not be read as a current compatibility matrix. Local build logs and raw recordings are excluded from this repository; source tests, written results and selected screenshots are included.
+Prolonged use in the actual panel, hardware hot-plug, physical Bluetooth timing and mixed-monitor scaling remain open checks. Historical reports describe earlier versions and must not be read as a current compatibility matrix. Local build logs and raw recordings are excluded from this repository; source tests, written results and selected screenshots are included.
 
 ## Requirements
 
@@ -92,12 +92,16 @@ When upgrading a native plugin already loaded by `plasmashell`, a process can re
 | Aurora, Ember, Ice, Grove, Iris, Coral | Six curated palettes with bounded hue ranges; Grove stays green, Iris violet, and Coral moves from pink to orange |
 | Audio-reactive colors | Enabled by default; slowly shifts hue with the frequency balance. Disable for the original fixed gradient |
 | Light intensity | Adjusts brightness without changing audio normalization |
+| Curvature | 50–125%, default 100%. Scales the broad audio-driven curve without speeding up movement |
+| Ribbon fullness | 60–130%, default 100%. Adjusts bundle thickness and filament spread |
 | Audio sensitivity | Scales the analyzed response after the absolute silence gate |
 | Frame limit | 30 FPS by default; 60 FPS optional |
 | Reduced motion | Holds the broad shape and procedural phase still and removes travelling ripples and short accent motion |
 | Simple rendering | Uses a lightweight Canvas curve; automatic with software rendering or shader failure |
 
 Reduced motion also follows Plasma's disabled-animation setting. Audio and rendering status appear in the configuration dialog. The panel remains a transparent ribbon without persistent error text. During silence, the empty panel space is still clickable.
+
+The configuration dialog previews draft settings at the widget's actual panel size and orientation, using the same audio source. The preview stays visible when the controls scroll. During silence it waits for audio; it does not generate a demonstration signal. **Apply** saves changes to the panel and popup; **Cancel** discards them. **Reset appearance** restores palette, audio-reactive colors, light intensity, curvature and fullness to their defaults. It leaves audio sensitivity, frame limit, reduced motion and simple rendering unchanged and still requires Apply.
 
 Palette tints adapt to the theme's nominal background color: deeper colors on light surfaces, luminous colors on dark surfaces. This also applies to simple rendering and does not change the fade to silence.
 

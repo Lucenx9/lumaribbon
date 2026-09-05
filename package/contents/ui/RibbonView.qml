@@ -10,12 +10,18 @@ Item {
     property int paletteIndex: 0
     property bool dynamicColor: true
     property real intensity: 1.0
+    property real curvature: 1.0
+    property real fullness: 1.0
     property real sensitivity: 1.0
     property int fps: 30
     property bool reducedMotion: false
     property bool forceFallback: false
     property bool vertical: false
     property bool viewEnabled: true
+    // A draft preview must not change the installed view's diagnostics.
+    property bool reportStatus: true
+    readonly property real curveScale: isFinite(curvature) ? Math.max(0.5, Math.min(1.25, curvature)) : 1
+    readonly property real fullnessScale: isFinite(fullness) ? Math.max(0.6, Math.min(1.3, fullness)) : 1
     // Nominal host background, not a sampled screen pixel. No opaque backing is drawn.
     property color backdropColor: "#20242c"
     readonly property bool lightBackground: 0.2126 * backdropColor.r + 0.7152 * backdropColor.g
@@ -75,7 +81,7 @@ Item {
         if (fallbackCanvas) fallbackCanvas.requestPaint();
     }
     function reportRendering() {
-        if (audio && typeof audio.reportRendering === "function") audio.reportRendering(fallback);
+        if (reportStatus && audio && typeof audio.reportRendering === "function") audio.reportRendering(fallback);
     }
     Component.onCompleted: reportRendering()
     onRenderActiveChanged: if (renderActive) refresh()
@@ -86,6 +92,9 @@ Item {
         if (fallbackCanvas) fallbackCanvas.requestPaint();
     }
     onReducedMotionChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
+    onCurveScaleChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
+    onFullnessScaleChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
+    onStrengthChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
 
     Connections {
         target: root.audio
@@ -120,6 +129,7 @@ Item {
                 property vector4d accents: Qt.vector4d(root.accents.x, root.accents.y, root.accents.z,
                     root.frame.rippleOrigin === undefined ? 0.46 : root.frame.rippleOrigin)
                 property vector4d shape: root.shape
+                property vector2d appearance: Qt.vector2d(root.curveScale, root.fullnessScale)
                 property color colorA: root.startColor
                 property color colorB: root.endColor
                 property color colorC: root.highlightColor
@@ -143,7 +153,7 @@ Item {
                     if (e < 0.001) return;
                     const phase = root.reducedMotion ? 0.65 : root.frame.phase;
                     const body = (0.13 + 0.065 * e + 0.02 * root.frame.bass)
-                        * (root.reducedMotion ? 0.35 : 1);
+                        * (root.reducedMotion ? 0.35 : 1) * root.curveScale;
                     const gradient = ctx.createLinearGradient(0, 0, width, 0);
                     gradient.addColorStop(0, "transparent");
                     gradient.addColorStop(0.13, root.startColor);
@@ -152,12 +162,12 @@ Item {
                     ctx.lineCap = "round";
                     ctx.strokeStyle = gradient;
                     // Faint nested strokes soften the halo without an expensive blur.
-                    const glowWidth = height * (0.17 + 0.11 * root.frame.bass + 0.04 * root.accents.x);
+                    const glowWidth = height * (0.17 + 0.11 * root.frame.bass + 0.04 * root.accents.x) * root.fullnessScale;
                     for (let layer = 0; layer < 8; ++layer) {
                         const depth = layer / 7;
                         ctx.globalAlpha = Math.min(1, Math.sqrt(e) * root.strength)
                             * (layer === 7 ? 0.64 + 0.1 * root.accents.z : 0.018 + 0.075 * depth * depth);
-                        ctx.lineWidth = layer === 7 ? Math.max(1.2, height * 0.018)
+                        ctx.lineWidth = layer === 7 ? Math.max(1.2, height * 0.018 * root.fullnessScale)
                             : glowWidth * (1 - depth * 0.88);
                         ctx.beginPath();
                         for (let i = 0; i <= 64; ++i) {
@@ -174,6 +184,21 @@ Item {
                         }
                         ctx.stroke();
                     }
+                    // Match the shader's clear outer pixel and soften wide halo
+                    // tails at the combined upper limits of the appearance sliders.
+                    const edge = ctx.createLinearGradient(0, 0, 0, height);
+                    const border = Math.min(0.1, 1 / height);
+                    const fade = Math.max(0.065, border * 2);
+                    edge.addColorStop(0, "transparent");
+                    edge.addColorStop(border, "transparent");
+                    edge.addColorStop(fade, "white");
+                    edge.addColorStop(1 - fade, "white");
+                    edge.addColorStop(1 - border, "transparent");
+                    edge.addColorStop(1, "transparent");
+                    ctx.globalAlpha = 1;
+                    ctx.globalCompositeOperation = "destination-in";
+                    ctx.fillStyle = edge;
+                    ctx.fillRect(0, 0, width, height);
                 }
             }
         }

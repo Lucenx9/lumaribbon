@@ -5,11 +5,13 @@
 #include <QTest>
 #include <QSignalSpy>
 #include <QImage>
+#include <QDir>
 #include <QTransform>
 #include <QVariantMap>
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include "SignalAnalyzer.h"
 #include "RibbonMotion.h"
@@ -19,7 +21,8 @@ class FrameAudio : public QObject {
     Q_PROPERTY(QVariantMap current MEMBER current)
 public:
     QVariantMap current;
-    Q_INVOKABLE QVariantMap sample(double) const { return current; }
+    int samples = 0;
+    Q_INVOKABLE QVariantMap sample(double) { ++samples; return current; }
 };
 
 namespace {
@@ -89,11 +92,113 @@ double center(const QImage &image, int x) {
     }
     return mass > 0 ? moment / mass : 0;
 }
+
+double excursion(const QImage &image) {
+    double low = image.height(), high = 0;
+    for (int x = image.width() / 8; x < image.width() * 7 / 8; ++x) {
+        low = std::min(low, center(image, x));
+        high = std::max(high, center(image, x));
+    }
+    return (high - low) / image.height();
+}
+
+double spread(const QImage &image) {
+    double mass = 0, variance = 0;
+    for (int x = image.width() / 4; x < image.width() * 3 / 4; ++x) {
+        const double mean = center(image, x);
+        for (int y = 0; y < image.height(); ++y) {
+            const auto alpha = image.constScanLine(y)[x * 4 + 3];
+            mass += alpha;
+            variance += alpha * (y - mean) * (y - mean);
+        }
+    }
+    return std::sqrt(variance / std::max(1.0, mass)) / image.height();
+}
 }
 
 class MotionViewTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void appearanceControls_data() {
+        QTest::addColumn<bool>("fallback");
+        QTest::addColumn<QSize>("size");
+        for (bool fallback : {false, true})
+            for (const auto &size : {QSize(160, 32), QSize(200, 40), QSize(240, 48), QSize(40, 200), QSize(560, 260)})
+                QTest::newRow(qPrintable(QString("%1-%2x%3").arg(fallback ? "canvas" : "shader").arg(size.width()).arg(size.height())))
+                    << fallback << size;
+    }
+    void appearanceControls() {
+        QFETCH(bool, fallback);
+        QFETCH(QSize, size);
+        FrameAudio audio;
+        auto frame = analyzedMix(true);
+        for (const auto *key : {"energy", "bass", "mid", "treble"})
+            frame[key] = std::min(1.0, frame[key].toDouble() * 2.0);
+        for (const auto *key : {"bassAccent", "midAccent", "trebleAccent", "onset"}) frame[key] = 1.0;
+        frame["rippleAge"] = 0.12;
+        audio.current = frame;
+        const bool vertical = size.height() > size.width();
+        QQuickView view;
+        view.setColor(Qt::transparent);
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"forceFallback", fallback}, {"dynamicColor", false}, {"paletteIndex", 1}, {"vertical", vertical}, {"intensity", 1.6}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        view.resize(size);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        const auto baseline = capture(view, frame);
+        const auto grab = [&]() {
+            QTest::qWait(65);
+            auto image = view.grabWindow().convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+            return vertical ? image.transformed(QTransform().rotate(90)) : image;
+        };
+        QImage corners[2][2];
+        const int samples = audio.samples;
+        for (int c = 0; c < 2; ++c) {
+            for (int f = 0; f < 2; ++f) {
+                view.rootObject()->setProperty("curvature", c ? 1.25 : 0.5);
+                view.rootObject()->setProperty("fullness", f ? 1.3 : 0.6);
+                auto &image = corners[c][f];
+                image = grab(); // No frame refresh: draft edits must repaint on their own.
+                QVERIFY(!image.isNull() && light(image) > 1000);
+                QVERIFY(!view.rootObject()->property("shaderFailed").toBool());
+                QVERIFY(excursion(image) < 0.55);
+                for (int x = 0; x < image.width(); ++x) {
+                    QVERIFY2(image.pixelColor(x, 0).alpha() < 3, "Appearance bounds must not clip the top halo.");
+                    QVERIFY2(image.pixelColor(x, image.height() - 1).alpha() < 3, "Appearance bounds must not clip the bottom halo.");
+                }
+                const auto directory = qEnvironmentVariable("LUMA_APPEARANCE_CAPTURE");
+                if (!directory.isEmpty())
+                    QVERIFY(image.save(QDir(directory).filePath(QString("%1-c%2-f%3.png").arg(QTest::currentDataTag()).arg(c).arg(f))));
+            }
+        }
+        QCOMPARE(audio.samples, samples);
+        for (int f = 0; f < 2; ++f)
+            QVERIFY2(excursion(corners[1][f]) > excursion(corners[0][f]) * 1.5, "Curvature must change the broad curve.");
+        for (int c = 0; c < 2; ++c)
+            QVERIFY2(spread(corners[c][1]) > spread(corners[c][0]) * 1.3, "Fullness must widen the bundle around its center.");
+        // Returning to the defaults is exact; invalid config values stay finite.
+        view.rootObject()->setProperty("curvature", 1.0);
+        view.rootObject()->setProperty("fullness", 1.0);
+        const auto defaults = grab();
+        QCOMPARE(defaults, vertical ? baseline.transformed(QTransform().rotate(90)) : baseline);
+        view.rootObject()->setProperty("curvature", std::numeric_limits<double>::quiet_NaN());
+        view.rootObject()->setProperty("fullness", std::numeric_limits<double>::infinity());
+        QCOMPARE(grab(), defaults);
+        view.rootObject()->setProperty("curvature", -500.0);
+        view.rootObject()->setProperty("fullness", 500.0);
+        QCOMPARE(grab(), corners[0][1]);
+        view.rootObject()->setProperty("curvature", 1.25);
+        view.rootObject()->setProperty("reducedMotion", true);
+        const auto reduced = capture(view, frame);
+        frame["phase"] = 17.0;
+        frame["arch"] = -0.8;
+        QCOMPARE(capture(view, frame), reduced);
+        frame["energy"] = 0.0;
+        QCOMPARE(light(capture(view, frame)), uint64_t(0));
+    }
     void mixedBandBody_data() {
         QTest::addColumn<bool>("fallback");
         QTest::addColumn<bool>("includeMids");

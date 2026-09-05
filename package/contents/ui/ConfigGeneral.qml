@@ -12,19 +12,81 @@ KCM.SimpleKCM {
     property alias cfg_palette: palette.currentIndex
     property alias cfg_dynamicColor: dynamicColor.checked
     property alias cfg_intensity: intensity.value
+    property alias cfg_curvature: curvature.value
+    property alias cfg_fullness: fullness.value
     property alias cfg_sensitivity: sensitivity.value
     property int cfg_fps: 30
     property alias cfg_reducedMotion: reduced.checked
     property alias cfg_forceFallback: fallback.checked
     // Plasma also supplies the generated defaults from KConfigPropertyMap.
-    property int cfg_paletteDefault
-    property bool cfg_dynamicColorDefault
-    property real cfg_intensityDefault
-    property real cfg_sensitivityDefault
-    property int cfg_fpsDefault
+    property int cfg_paletteDefault: 0
+    property bool cfg_dynamicColorDefault: true
+    property real cfg_intensityDefault: 1
+    property real cfg_curvatureDefault: 1
+    property real cfg_fullnessDefault: 1
+    property real cfg_sensitivityDefault: 1
+    property int cfg_fpsDefault: 30
     property bool cfg_reducedMotionDefault
     property bool cfg_forceFallbackDefault
     readonly property var audio: Plasmoid.audio
+    readonly property bool updatePending: !!audio && Plasmoid.previewSize === undefined
+    readonly property size previewSize: Plasmoid.previewSize === undefined ? Qt.size(200, 40) : Plasmoid.previewSize
+
+    function resetAppearance() {
+        cfg_palette = cfg_paletteDefault;
+        cfg_dynamicColor = cfg_dynamicColorDefault;
+        cfg_intensity = cfg_intensityDefault;
+        cfg_curvature = cfg_curvatureDefault;
+        cfg_fullness = cfg_fullnessDefault;
+    }
+
+    // Keep the result visible while scrolling the controls on a small screen.
+    header: ColumnLayout {
+        spacing: Kirigami.Units.smallSpacing
+        Controls.Label {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: Kirigami.Units.smallSpacing
+            text: qsTr("Live preview")
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: preview.height + Kirigami.Units.largeSpacing * 2
+            color: Kirigami.Theme.backgroundColor
+            RibbonView {
+                id: preview
+                objectName: "appearancePreview"
+                anchors.centerIn: parent
+                width: root.previewSize.width * Math.min(1, parent.width / Math.max(1, root.previewSize.width))
+                height: root.previewSize.height * Math.min(1, parent.width / Math.max(1, root.previewSize.width))
+                vertical: root.previewSize.height > root.previewSize.width
+                audio: root.audio
+                viewEnabled: !!root.audio && root.visible
+                reportStatus: false
+                backdropColor: Kirigami.Theme.backgroundColor
+                paletteIndex: root.cfg_palette
+                dynamicColor: root.cfg_dynamicColor
+                intensity: root.cfg_intensity
+                curvature: root.cfg_curvature
+                fullness: root.cfg_fullness
+                sensitivity: root.cfg_sensitivity
+                fps: root.cfg_fps
+                reducedMotion: root.cfg_reducedMotion || Kirigami.Units.longDuration === 0
+                forceFallback: root.cfg_forceFallback
+            }
+        }
+        Controls.Label {
+            Layout.fillWidth: true
+            Layout.bottomMargin: Kirigami.Units.smallSpacing
+            horizontalAlignment: Text.AlignHCenter
+            text: root.updatePending ? qsTr("Log out and back in to enable the new appearance controls.")
+                : !root.audio || root.audio.hasError ? qsTr("Preview unavailable. Check audio output below.")
+                : preview.frame.energy === 0 ? qsTr("Play audio to preview. Apply saves your changes.")
+                : qsTr("Apply saves your changes.")
+            wrapMode: Text.Wrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.7
+        }
+    }
 
     Kirigami.FormLayout {
         Controls.ComboBox {
@@ -53,6 +115,42 @@ KCM.SimpleKCM {
                 horizontalAlignment: Text.AlignRight
             }
         }
+        AppearanceControl {
+            id: curvature
+            objectName: "curvatureControl"
+            enabled: !root.updatePending
+            Kirigami.FormData.label: qsTr("Curvature:")
+            accessibleName: qsTr("Curvature")
+            from: 0.5; to: 1.25
+            defaultValue: root.cfg_curvatureDefault
+            lowText: qsTr("Subtle")
+            highText: qsTr("Pronounced")
+        }
+        AppearanceControl {
+            id: fullness
+            objectName: "fullnessControl"
+            enabled: !root.updatePending
+            Kirigami.FormData.label: qsTr("Ribbon fullness:")
+            accessibleName: qsTr("Ribbon fullness")
+            from: 0.6; to: 1.3
+            defaultValue: root.cfg_fullnessDefault
+            lowText: qsTr("Fine")
+            highText: qsTr("Full")
+        }
+        Controls.Button {
+            objectName: "resetAppearance"
+            text: qsTr("Reset appearance")
+            icon.name: "edit-undo"
+            enabled: !root.updatePending && (root.cfg_palette !== root.cfg_paletteDefault
+                || root.cfg_dynamicColor !== root.cfg_dynamicColorDefault
+                || Math.abs(root.cfg_intensity - root.cfg_intensityDefault) > 0.001
+                || Math.abs(root.cfg_curvature - root.cfg_curvatureDefault) > 0.001
+                || Math.abs(root.cfg_fullness - root.cfg_fullnessDefault) > 0.001)
+            onClicked: root.resetAppearance()
+            Controls.ToolTip.text: qsTr("Resets palette, audio-reactive colors, light intensity, curvature and fullness. Apply to save.")
+            Controls.ToolTip.visible: hovered
+        }
+        Kirigami.Separator { Kirigami.FormData.isSection: true }
         RowLayout {
             Kirigami.FormData.label: qsTr("Audio sensitivity:")
             Controls.Slider {

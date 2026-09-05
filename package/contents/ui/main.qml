@@ -17,12 +17,21 @@ PlasmoidItem {
     toolTipSubText: panel ? qsTr("Light that follows your audio. Click to expand.")
         : qsTr("Light that follows your audio.")
 
+    Binding {
+        target: Plasmoid
+        property: "previewSize"
+        value: root.panel ? Qt.size(root.width, root.height) : Qt.size(200, 40)
+        when: Plasmoid.previewSize !== undefined
+    }
+
     component ConfiguredRibbon: RibbonView {
         audio: root.audio
         backdropColor: Kirigami.Theme.backgroundColor
         paletteIndex: Plasmoid.configuration.palette
         dynamicColor: Plasmoid.configuration.dynamicColor
         intensity: Plasmoid.configuration.intensity
+        curvature: Plasmoid.configuration.curvature
+        fullness: Plasmoid.configuration.fullness
         sensitivity: Plasmoid.configuration.sensitivity
         fps: Plasmoid.configuration.fps
         reducedMotion: Plasmoid.configuration.reducedMotion || Kirigami.Units.longDuration === 0
