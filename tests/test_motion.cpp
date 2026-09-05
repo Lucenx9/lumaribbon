@@ -83,6 +83,20 @@ int main() {
     for (float dt : {0.0f, -1.0f, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()})
         check(distance(previous, motion.advance(loud, dt)) < 0.000001f, "invalid elapsed time cannot advance motion");
 
+    for (auto field : {&Features::energy, &Features::bass, &Features::mid, &Features::treble}) {
+        for (float invalid : {std::numeric_limits<float>::quiet_NaN(),
+                std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()}) {
+            Features poisoned = loud;
+            poisoned.*field = invalid;
+            const auto shape = motion.advance(poisoned, 0.01f);
+            finite(shape);
+            check(distance(previous, shape) == 0, "each non-finite feature holds the current shape");
+        }
+    }
+    const RibbonShape recovered = motion.advance(loud, 0.01f);
+    finite(recovered);
+    check(distance(previous, recovered) > 0.001f, "motion keeps responding after non-finite features");
+
     RibbonMotion stalled, capped;
     check(distance(stalled.advance(loud, 10), capped.advance(loud, 0.1f)) == 0,
         "a delayed worker takes a bounded step instead of replaying a backlog");

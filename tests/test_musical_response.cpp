@@ -164,6 +164,31 @@ void repetitionAndGaps() {
     for (unsigned n = 0; n < 50; ++n) analyzer.feed(block, 48000);
     check(analyzer.features().onset < 0.001f && analyzer.features().energy < 0.001f, "resuming in silence has no stale accents");
 }
+// A capture generation break must not carry the previous device's loudness
+// into the new one: quiet accents stay visible right after a device switch.
+void accentAfterDeviceSwitch() {
+    SignalAnalyzer analyzer;
+    std::array<StereoFrame, 512> block;
+    unsigned sample = 0;
+    float peak = 0;
+    const auto feed = [&](unsigned blocks, float amplitude, double hz) {
+        for (unsigned n = 0; n < blocks; ++n) {
+            for (auto &frame : block) {
+                const float value = amplitude * sine(hz, double(sample++) / 48000);
+                frame = {value, value};
+            }
+            analyzer.feed(block, 48000);
+            peak = std::max(peak, analyzer.features().accents[0]);
+        }
+    };
+    feed(180, 0.34f, 94);
+    analyzer.discontinuity();
+    feed(4, 0.0f, 94);
+    peak = 0;
+    feed(40, 0.02f, 94);
+    std::cout << "Quiet bass accent after a device switch: peak=" << peak << '\n';
+    check(peak > 0.12f, "a quiet bass attack is heard after switching to a quieter device");
+}
 void closeNotes() {
     bool passed = true;
     for (unsigned rate : {44100u, 48000u, 96000u, 192000u}) {
@@ -255,5 +280,6 @@ void phraseAndVibrato() {
 int main(int argc, char **argv) {
     if (argc == 2 && std::string_view(argv[1]) == "--close-notes") { closeNotes(); return 0; }
     if (argc == 2 && std::string_view(argv[1]) == "--fast-accents") { fastAccents(); return 0; }
-    maskedAccent(); bandAccents(); timbreAndRestraint(); repetitionAndGaps(); closeNotes(); fastAccents(); phraseAndVibrato();
+    maskedAccent(); bandAccents(); timbreAndRestraint(); repetitionAndGaps(); accentAfterDeviceSwitch();
+    closeNotes(); fastAccents(); phraseAndVibrato();
 }

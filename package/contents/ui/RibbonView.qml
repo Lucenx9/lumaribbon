@@ -50,9 +50,8 @@ Item {
     readonly property real colorBalance: colorPosition * colorPosition * (3 - 2 * colorPosition)
     readonly property real colorHighlight: colorActive ? (frame.trebleShare || 0) : 0
     // Open the gradient around the same timbre-selected center. Mixed passages
-    // span up to 41% of the ramp. Light-theme Ice uses 20% to retain small
-    // timbre changes in the simple renderer. Dominant hues remain unchanged.
-    readonly property real colorSpread: (paletteIndex === 2 && lightBackground ? 0.08 : 0.5)
+    // span up to 41% of the ramp; the palette module owns per-palette limits.
+    readonly property real colorSpread: Palette.spreadLimit(paletteIndex, lightBackground)
         * colorBalance * (1 - colorBalance)
     readonly property color startColor: colorActive
         ? mixColor(Palette.sample(paletteRamp, 0.84 * colorBalance - colorSpread), highlightColor, 0.08 * colorHighlight)

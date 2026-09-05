@@ -23,6 +23,14 @@ static std::array<double, 3> perceptualColor(QColor color) {
         0.0259040371*l + 0.7827717662*m - 0.8086757660*s};
 }
 
+// True when the simple renderer is active for reasons other than a real
+// shader failure: the ripple tests then measure a renderer that by design
+// has no travelling ripple.
+static bool softwareRendererActive(QQuickView &view) {
+    return view.rootObject()->property("fallback").toBool()
+        && !view.rootObject()->property("shaderFailed").toBool();
+}
+
 class TestAudio : public QObject {
     Q_OBJECT
 public:
@@ -478,6 +486,8 @@ private Q_SLOTS:
         view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
         QCOMPARE(view.status(), QQuickView::Ready);
+        if (softwareRendererActive(view))
+            QSKIP("The scene graph silently fell back to software; no travelling attack ripple.");
         view.resize(640, 190);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -521,6 +531,8 @@ private Q_SLOTS:
         view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
         QCOMPARE(view.status(), QQuickView::Ready);
+        if (softwareRendererActive(view))
+            QSKIP("The scene graph silently fell back to software; no travelling attack ripple.");
         view.resize(200, 40);
         view.show();
         QVERIFY(QTest::qWaitForWindowExposed(&view));
