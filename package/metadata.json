@@ -1,0 +1,16 @@
+{
+    "KPlugin": {
+        "Id": "org.kde.plasma.lumaribbon",
+        "Name": "Luma Ribbon",
+        "Description": "A ribbon of light that follows music on the default audio output",
+        "Icon": "preferences-desktop-sound",
+        "Category": "Multimedia",
+        "License": "GPL-3.0-or-later",
+        "Version": "0.1.0",
+        "Authors": [{ "Name": "Luma Ribbon contributors" }]
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-API": "declarativeapplets",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

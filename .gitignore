@@ -1,0 +1,13 @@
+/build*/
+/stage/
+/.scratch/
+*.user
+
+# Local desktop/editor state and credentials.
+.directory
+.DS_Store
+/.idea/
+/.vscode/
+/.env
+/.env.*
+!/.env.example
