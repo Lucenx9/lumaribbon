@@ -6,6 +6,9 @@
 namespace Luma {
 RibbonShape RibbonMotion::advance(const Features &f, float seconds) {
     const float dt = std::isfinite(seconds) ? std::clamp(seconds, 0.0f, 0.1f) : 0.0f;
+    // Non-finite features would poison the springs permanently; hold the shape.
+    if (!std::isfinite(f.energy + f.bass + f.mid + f.treble))
+        return {value[0], value[1], value[2], value[3]};
     slowEnergy += (f.energy - slowEnergy) * -std::expm1(-dt / 0.85f);
     slowMid += (f.mid - slowMid) * -std::expm1(-dt / 0.65f);
     // Hold the disappearing shape instead of normalizing the noise floor or

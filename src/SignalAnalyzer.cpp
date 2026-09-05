@@ -52,6 +52,9 @@ void SignalAnalyzer::discontinuity() {
     filled = sinceHop = 0;
     spectrumReady = false;
     fluxMean.fill(0);
+    // Band references belong to the previous capture epoch; kept, they mute
+    // accents on a quieter device for as long as their slow release lasts.
+    bandReference.fill(0);
     accentPeak.fill(0);
     cooldown.fill(0.15f);
     result.accents.fill(0);

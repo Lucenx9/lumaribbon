@@ -28,6 +28,18 @@ AudioSnapshot AudioEngine::snapshot() const {
 }
 void AudioEngine::run(std::stop_token stop) {
     using namespace std::chrono;
+    // Rare initialization failures retry without retaining a half-built pipeline.
+    // Check stop during backoff so removing the final widget stays responsive.
+    const auto fail = [this, &stop](const QString &message) {
+        {
+            std::lock_guard lock(snapshotMutex);
+            latest = {};
+            latest.status.error = true;
+            latest.status.message = message;
+        }
+        for (unsigned n = 0; n < 50 && !stop.stop_requested(); ++n)
+            std::this_thread::sleep_for(milliseconds(100));
+    };
     while (!stop.stop_requested()) {
         try {
             AudioRing ring;
@@ -79,17 +91,11 @@ void AudioEngine::run(std::stop_token stop) {
                 std::this_thread::sleep_until(now + milliseconds(10));
             }
         } catch (const std::exception &e) {
-            {
-                std::lock_guard lock(snapshotMutex);
-                latest = {};
-                latest.status.error = true;
-                latest.status.message = QStringLiteral("Audio analysis unavailable: ") + QString::fromUtf8(e.what()) +
-                                        QStringLiteral(". Retrying automatically.");
-            }
-            // Rare initialization failures retry without retaining a half-built pipeline.
-            // Check stop during backoff so removing the final widget stays responsive.
-            for (unsigned n = 0; n < 50 && !stop.stop_requested(); ++n)
-                std::this_thread::sleep_for(milliseconds(100));
+            fail(QStringLiteral("Audio analysis unavailable: ") + QString::fromUtf8(e.what())
+                 + QStringLiteral(". Retrying automatically."));
+        } catch (...) {
+            // A non-standard exception must not terminate the host process.
+            fail(QStringLiteral("Audio analysis failed unexpectedly. Retrying automatically."));
         }
     }
 }
