@@ -14,6 +14,7 @@ KCM.SimpleKCM {
     property alias cfg_intensity: intensity.value
     property alias cfg_curvature: curvature.value
     property alias cfg_fullness: fullness.value
+    property alias cfg_bloom: bloom.value
     property alias cfg_sensitivity: sensitivity.value
     property int cfg_fps: 30
     property alias cfg_reducedMotion: reduced.checked
@@ -24,12 +25,13 @@ KCM.SimpleKCM {
     property real cfg_intensityDefault: 1
     property real cfg_curvatureDefault: 1
     property real cfg_fullnessDefault: 1
+    property real cfg_bloomDefault: 1
     property real cfg_sensitivityDefault: 1
     property int cfg_fpsDefault: 30
     property bool cfg_reducedMotionDefault
     property bool cfg_forceFallbackDefault
     readonly property var audio: Plasmoid.audio
-    readonly property bool updatePending: !!audio && Plasmoid.previewSize === undefined
+    readonly property bool updatePending: !!audio && !(Plasmoid.appearanceRevision >= 2)
     readonly property size previewSize: Plasmoid.previewSize === undefined ? Qt.size(200, 40) : Plasmoid.previewSize
 
     function resetAppearance() {
@@ -38,6 +40,7 @@ KCM.SimpleKCM {
         cfg_intensity = cfg_intensityDefault;
         cfg_curvature = cfg_curvatureDefault;
         cfg_fullness = cfg_fullnessDefault;
+        cfg_bloom = cfg_bloomDefault;
     }
 
     // Keep the result visible while scrolling the controls on a small screen.
@@ -68,6 +71,7 @@ KCM.SimpleKCM {
                 intensity: root.cfg_intensity
                 curvature: root.cfg_curvature
                 fullness: root.cfg_fullness
+                bloom: root.cfg_bloom
                 sensitivity: root.cfg_sensitivity
                 fps: root.cfg_fps
                 reducedMotion: root.cfg_reducedMotion || Kirigami.Units.longDuration === 0
@@ -137,6 +141,17 @@ KCM.SimpleKCM {
             lowText: qsTr("Fine")
             highText: qsTr("Full")
         }
+        AppearanceControl {
+            id: bloom
+            objectName: "bloomControl"
+            enabled: !root.updatePending
+            Kirigami.FormData.label: qsTr("Bloom:")
+            accessibleName: qsTr("Bloom")
+            from: 0; to: 1.5
+            defaultValue: root.cfg_bloomDefault
+            lowText: qsTr("Off")
+            highText: qsTr("Strong")
+        }
         Controls.Button {
             objectName: "resetAppearance"
             text: qsTr("Reset appearance")
@@ -145,9 +160,10 @@ KCM.SimpleKCM {
                 || root.cfg_dynamicColor !== root.cfg_dynamicColorDefault
                 || Math.abs(root.cfg_intensity - root.cfg_intensityDefault) > 0.001
                 || Math.abs(root.cfg_curvature - root.cfg_curvatureDefault) > 0.001
-                || Math.abs(root.cfg_fullness - root.cfg_fullnessDefault) > 0.001)
+                || Math.abs(root.cfg_fullness - root.cfg_fullnessDefault) > 0.001
+                || Math.abs(root.cfg_bloom - root.cfg_bloomDefault) > 0.001)
             onClicked: root.resetAppearance()
-            Controls.ToolTip.text: qsTr("Resets palette, audio-reactive colors, light intensity, curvature and fullness. Apply to save.")
+            Controls.ToolTip.text: qsTr("Resets palette, audio-reactive colors, light intensity, curvature, fullness and bloom. Apply to save.")
             Controls.ToolTip.visible: hovered
         }
         Kirigami.Separator { Kirigami.FormData.isSection: true }

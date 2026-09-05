@@ -32,6 +32,7 @@ PlasmoidItem {
         intensity: Plasmoid.configuration.intensity
         curvature: Plasmoid.configuration.curvature
         fullness: Plasmoid.configuration.fullness
+        bloom: Plasmoid.configuration.bloom
         sensitivity: Plasmoid.configuration.sensitivity
         fps: Plasmoid.configuration.fps
         reducedMotion: Plasmoid.configuration.reducedMotion || Kirigami.Units.longDuration === 0

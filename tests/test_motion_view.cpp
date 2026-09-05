@@ -119,6 +119,86 @@ double spread(const QImage &image) {
 class MotionViewTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void bloomControl_data() {
+        QTest::addColumn<bool>("fallback");
+        QTest::addColumn<QSize>("size");
+        QTest::addColumn<bool>("lightBackground");
+        for (bool fallback : {false, true})
+            for (const auto &size : {QSize(160, 32), QSize(200, 40), QSize(240, 48), QSize(40, 200), QSize(560, 260)})
+                for (bool lightBackground : {false, true})
+                    QTest::newRow(qPrintable(QString("%1-%2x%3-%4").arg(fallback ? "canvas" : "shader")
+                        .arg(size.width()).arg(size.height()).arg(lightBackground ? "light" : "dark")))
+                        << fallback << size << lightBackground;
+    }
+    void bloomControl() {
+        QFETCH(bool, fallback);
+        QFETCH(QSize, size);
+        QFETCH(bool, lightBackground);
+        FrameAudio audio;
+        auto frame = analyzedMix(true);
+        for (const auto *key : {"energy", "bass", "mid", "treble"})
+            frame[key] = std::min(1.0, frame[key].toDouble() * 2.0);
+        for (const auto *key : {"bassAccent", "midAccent", "trebleAccent", "onset"}) frame[key] = 1.0;
+        frame["rippleAge"] = 0.12;
+        audio.current = frame;
+        const bool vertical = size.height() > size.width();
+        QQuickView view;
+        view.setColor(Qt::transparent);
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"forceFallback", fallback}, {"dynamicColor", false}, {"paletteIndex", 1}, {"vertical", vertical},
+            {"intensity", 1.6}, {"curvature", 1.25}, {"fullness", 1.3},
+            {"backdropColor", lightBackground ? "#ffffff" : "#161824"}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        view.resize(size);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        const auto original = capture(view, frame);
+        const auto shape = view.rootObject()->property("shape");
+        const int samples = audio.samples;
+        const auto setBloom = [&](double amount) {
+            view.rootObject()->setProperty("bloom", amount);
+            QTest::qWait(65);
+            return view.grabWindow().convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+        };
+        const auto off = setBloom(0.0);
+        const auto half = setBloom(0.5);
+        const auto maximum = setBloom(1.5);
+        QVERIFY(!original.isNull() && !off.isNull() && !maximum.isNull());
+        QVERIFY(!view.rootObject()->property("shaderFailed").toBool());
+        QVERIFY2(light(off) > 1000, "Disabling bloom must keep the filaments visible.");
+        QVERIFY(light(half) > light(off));
+        QVERIFY(light(original) > light(half));
+        QVERIFY(light(maximum) > light(original));
+        QCOMPARE(view.rootObject()->property("shape"), shape);
+        QCOMPARE(audio.samples, samples); // Repaint a held frame without touching analysis.
+        const auto edges = vertical ? maximum.transformed(QTransform().rotate(90)) : maximum;
+        for (int x = 0; x < edges.width(); ++x) {
+            QVERIFY(edges.pixelColor(x, 0).alpha() < 3);
+            QVERIFY(edges.pixelColor(x, edges.height() - 1).alpha() < 3);
+        }
+        QCOMPARE(setBloom(1.0), original);
+        QCOMPARE(setBloom(-100.0), off);
+        QCOMPARE(setBloom(100.0), maximum);
+        QCOMPARE(setBloom(std::numeric_limits<double>::quiet_NaN()), original);
+        QCOMPARE(setBloom(std::numeric_limits<double>::infinity()), original);
+        const auto directory = qEnvironmentVariable("LUMA_BLOOM_CAPTURE");
+        if (!directory.isEmpty()) {
+            const QDir dir(directory);
+            QVERIFY(off.save(dir.filePath(QString("%1-off.png").arg(QTest::currentDataTag()))));
+            QVERIFY(original.save(dir.filePath(QString("%1-default.png").arg(QTest::currentDataTag()))));
+            QVERIFY(maximum.save(dir.filePath(QString("%1-max.png").arg(QTest::currentDataTag()))));
+        }
+        view.rootObject()->setProperty("bloom", 1.5);
+        view.rootObject()->setProperty("reducedMotion", true);
+        const auto reduced = capture(view, frame);
+        frame["phase"] = 14.0;
+        frame["arch"] = -0.8;
+        QCOMPARE(capture(view, frame), reduced);
+        frame["energy"] = 0.0;
+        QCOMPARE(light(capture(view, frame)), uint64_t(0));
+    }
     void appearanceControls_data() {
         QTest::addColumn<bool>("fallback");
         QTest::addColumn<QSize>("size");

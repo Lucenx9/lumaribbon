@@ -78,7 +78,7 @@ private Q_SLOTS:
             if (child->metaObject()->indexOfProperty("renderActive") >= 0) { panelRibbon = child; break; }
         }
         QVERIFY(panelRibbon);
-        for (const auto *key : {"curvature", "fullness"}) {
+        for (const auto *key : {"curvature", "fullness", "bloom"}) {
             QCOMPARE(first->configuration()->value(QString::fromLatin1(key)).toDouble(), 1.0);
             QCOMPARE(panelRibbon->property(key).toDouble(), 1.0);
             QCOMPARE(popupRibbon->property(key).toDouble(), 1.0);
@@ -102,8 +102,8 @@ private Q_SLOTS:
         // including the generated *Default entries, as initial properties.
         const QVariantMap initialSettings{{"title", "Appearance"},
             {"cfg_palette", 0}, {"cfg_intensity", 1.2}, {"cfg_sensitivity", 1.5},
-            {"cfg_curvature", 0.8}, {"cfg_fullness", 1.15},
-            {"cfg_curvatureDefault", 1.0}, {"cfg_fullnessDefault", 1.0},
+            {"cfg_curvature", 0.8}, {"cfg_fullness", 1.15}, {"cfg_bloom", 0.65},
+            {"cfg_curvatureDefault", 1.0}, {"cfg_fullnessDefault", 1.0}, {"cfg_bloomDefault", 1.0},
             {"cfg_dynamicColor", true}, {"cfg_dynamicColorDefault", true},
             {"cfg_fps", 60}, {"cfg_reducedMotion", false}, {"cfg_forceFallback", false},
             {"cfg_paletteDefault", 0}, {"cfg_intensityDefault", 1.0}, {"cfg_sensitivityDefault", 1.0},
@@ -156,6 +156,7 @@ private Q_SLOTS:
         QTRY_VERIFY(preview->property("renderActive").toBool());
         QCOMPARE(preview->property("curvature").toDouble(), 0.8);
         QCOMPARE(preview->property("fullness").toDouble(), 1.15);
+        QCOMPARE(preview->property("bloom").toDouble(), 0.65);
         QCOMPARE(preview->property("fps").toInt(), 60);
         QVERIFY(!preview->property("reportStatus").toBool());
         const auto renderingStatus = audio->property("renderingStatus");
@@ -165,8 +166,9 @@ private Q_SLOTS:
         // Draft edits reach the preview during a drag, before release or Apply.
         auto *curveSlider = page->findChild<QQuickItem *>(QStringLiteral("curvatureControlSlider"));
         auto *fullSlider = page->findChild<QQuickItem *>(QStringLiteral("fullnessControlSlider"));
-        QVERIFY(curveSlider && fullSlider);
-        for (auto *slider : {curveSlider, fullSlider}) {
+        auto *bloomSlider = page->findChild<QQuickItem *>(QStringLiteral("bloomControlSlider"));
+        QVERIFY(curveSlider && fullSlider && bloomSlider);
+        for (auto *slider : {curveSlider, fullSlider, bloomSlider}) {
             const auto position = slider->mapToScene(QPointF(slider->width() * 0.8, slider->height() / 2)).toPoint();
             QVERIFY(position.y() > 0 && position.y() < settingsWindow.height());
             auto *handle = slider->property("handle").value<QQuickItem *>();
@@ -175,7 +177,7 @@ private Q_SLOTS:
             QTest::mousePress(&settingsWindow, Qt::LeftButton, Qt::NoModifier, start);
             QTest::mouseMove(&settingsWindow, position, 20);
             QVERIFY(slider->property("pressed").toBool());
-            const char *key = slider == curveSlider ? "curvature" : "fullness";
+            const char *key = slider == curveSlider ? "curvature" : slider == fullSlider ? "fullness" : "bloom";
             QTRY_COMPARE(preview->property(key), slider->property("value"));
             QVERIFY(preview->property(key).toDouble() > 1.0);
             QCOMPARE(panelRibbon->property(key).toDouble(), 1.0);
@@ -195,7 +197,7 @@ private Q_SLOTS:
         const auto resetPosition = reset->mapToScene(QPointF(reset->width() / 2, reset->height() / 2)).toPoint();
         QVERIFY(resetPosition.y() < settingsWindow.height());
         QTest::mouseClick(&settingsWindow, Qt::LeftButton, Qt::NoModifier, resetPosition);
-        for (const auto *key : {"palette", "dynamicColor", "intensity", "curvature", "fullness"}) {
+        for (const auto *key : {"palette", "dynamicColor", "intensity", "curvature", "fullness", "bloom"}) {
             const QByteArray setting = QByteArray("cfg_") + key;
             QCOMPARE(form->property(setting), form->property(setting + "Default"));
         }
@@ -207,6 +209,7 @@ private Q_SLOTS:
         // Mimic Apply through the same KConfigPropertyMap used by Plasma.
         first->configuration()->insert(QStringLiteral("curvature"), 1.2);
         first->configuration()->insert(QStringLiteral("fullness"), 0.75);
+        first->configuration()->insert(QStringLiteral("bloom"), 0.0);
         first->configuration()->writeConfig();
         corona.requireConfigSync();
         KConfig saved(settings.filePath(QStringLiteral("plasma-appletsrc")), KConfig::SimpleConfig);
@@ -215,8 +218,11 @@ private Q_SLOTS:
             .group(QStringLiteral("General"));
         QCOMPARE(general.readEntry("curvature", 0.0), 1.2);
         QCOMPARE(general.readEntry("fullness", 0.0), 0.75);
+        QCOMPARE(general.readEntry("bloom", -1.0), 0.0);
         QTRY_COMPARE(panelRibbon->property("curvature").toDouble(), 1.2);
         QTRY_COMPARE(popupRibbon->property("fullness").toDouble(), 0.75);
+        QTRY_COMPARE(panelRibbon->property("bloom").toDouble(), 0.0);
+        QTRY_COMPARE(popupRibbon->property("bloom").toDouble(), 0.0);
         settingsWindow.hide();
         QTRY_VERIFY(!preview->property("renderActive").toBool());
         settingsWindow.show();
@@ -272,6 +278,7 @@ private Q_SLOTS:
         QVERIFY(second && !second->failedToLaunch());
         QCOMPARE(second->configuration()->value(QStringLiteral("curvature")).toDouble(), 1.0);
         QCOMPARE(second->configuration()->value(QStringLiteral("fullness")).toDouble(), 1.0);
+        QCOMPARE(second->configuration()->value(QStringLiteral("bloom")).toDouble(), 1.0);
         QPointer<QObject> secondAudio = second->property("audio").value<QObject *>();
         QVERIFY(secondAudio && secondAudio != audio);
         delete first;

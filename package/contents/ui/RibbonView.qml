@@ -12,6 +12,7 @@ Item {
     property real intensity: 1.0
     property real curvature: 1.0
     property real fullness: 1.0
+    property real bloom: 1.0
     property real sensitivity: 1.0
     property int fps: 30
     property bool reducedMotion: false
@@ -22,6 +23,7 @@ Item {
     property bool reportStatus: true
     readonly property real curveScale: isFinite(curvature) ? Math.max(0.5, Math.min(1.25, curvature)) : 1
     readonly property real fullnessScale: isFinite(fullness) ? Math.max(0.6, Math.min(1.3, fullness)) : 1
+    readonly property real bloomStrength: isFinite(bloom) ? Math.max(0, Math.min(1.5, bloom)) : 1
     // Nominal host background, not a sampled screen pixel. No opaque backing is drawn.
     property color backdropColor: "#20242c"
     readonly property bool lightBackground: 0.2126 * backdropColor.r + 0.7152 * backdropColor.g
@@ -94,6 +96,7 @@ Item {
     onReducedMotionChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
     onCurveScaleChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
     onFullnessScaleChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
+    onBloomStrengthChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
     onStrengthChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
 
     Connections {
@@ -130,6 +133,7 @@ Item {
                     root.frame.rippleOrigin === undefined ? 0.46 : root.frame.rippleOrigin)
                 property vector4d shape: root.shape
                 property vector2d appearance: Qt.vector2d(root.curveScale, root.fullnessScale)
+                property real bloom: root.bloomStrength
                 property color colorA: root.startColor
                 property color colorB: root.endColor
                 property color colorC: root.highlightColor
@@ -163,10 +167,11 @@ Item {
                     ctx.strokeStyle = gradient;
                     // Faint nested strokes soften the halo without an expensive blur.
                     const glowWidth = height * (0.17 + 0.11 * root.frame.bass + 0.04 * root.accents.x) * root.fullnessScale;
-                    for (let layer = 0; layer < 8; ++layer) {
+                    for (let layer = root.bloomStrength === 0 ? 7 : 0; layer < 8; ++layer) {
                         const depth = layer / 7;
                         ctx.globalAlpha = Math.min(1, Math.sqrt(e) * root.strength)
-                            * (layer === 7 ? 0.64 + 0.1 * root.accents.z : 0.018 + 0.075 * depth * depth);
+                            * (layer === 7 ? 0.64 + 0.1 * root.accents.z
+                                : (0.018 + 0.075 * depth * depth) * root.bloomStrength);
                         ctx.lineWidth = layer === 7 ? Math.max(1.2, height * 0.018 * root.fullnessScale)
                             : glowWidth * (1 - depth * 0.88);
                         ctx.beginPath();

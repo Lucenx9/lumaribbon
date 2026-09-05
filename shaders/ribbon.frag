@@ -15,6 +15,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 colorB;
     vec4 colorC;
     vec2 appearance; // per-view curvature and fullness; both default to 1
+    float bloom; // halo and veil amount; leaves filament geometry unchanged
 };
 
 float gaussian(float distance, float width) {
@@ -80,7 +81,7 @@ void main() {
     // shift the whole bundle in the opposite direction and flatten that curve.
     float bundleOffset = veilCenter / totalWeight - center;
     vec3 ribbonColor = mix(colorA.rgb, colorB.rgb, smoothstep(0.08, 0.92, x));
-    float veil = gaussian(uv.y - center, (thickness * 1.8 + pixel) * taper);
+    float veil = gaussian(uv.y - center, (thickness * 1.8 + pixel) * taper) * bloom;
     sum += veil * ribbonColor * 0.18;
     density += veil * 0.18;
 
@@ -89,7 +90,7 @@ void main() {
         float distance = uv.y - (strands[i] - bundleOffset);
         float coreWidth = max(pixel * 0.5, (0.004 + 0.003 * bands.y) * appearance.y * (1.0 - 0.08 * abs(f)) * taper);
         float core = gaussian(distance, coreWidth);
-        float halo = gaussian(distance, (thickness * 0.62 + pixel) * taper);
+        float halo = gaussian(distance, (thickness * 0.62 + pixel) * taper) * bloom;
         float glint = accents.z * pow(0.5 + 0.5 * sin(x * 18.0 + f * 1.7 - t), 4.0);
         vec3 tint = mix(ribbonColor, colorC.rgb, core * (0.14 + bands.w * 0.17 + glint * 0.2));
         float light = (halo * 0.14 + core * (0.48 + glint * 0.12)) * filamentWeight(f);

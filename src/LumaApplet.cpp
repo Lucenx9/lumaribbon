@@ -7,11 +7,13 @@
 class LumaApplet : public Plasma::Applet {
     Q_OBJECT
     Q_PROPERTY(QObject *audio READ audio CONSTANT)
+    Q_PROPERTY(int appearanceRevision READ appearanceRevision CONSTANT)
     Q_PROPERTY(QSizeF previewSize READ previewSize WRITE setPreviewSize NOTIFY previewSizeChanged)
 public:
     LumaApplet(QObject *parent, const KPluginMetaData &data, const QVariantList &args)
         : Plasma::Applet(parent, data, args), state(new AudioState(this)) {}
     QObject *audio() const { return state; }
+    int appearanceRevision() const { return 2; } // Curvature, fullness and bloom.
     QSizeF previewSize() const { return m_previewSize; }
     void setPreviewSize(QSizeF size) {
         if (size.isEmpty() || size == m_previewSize) return;

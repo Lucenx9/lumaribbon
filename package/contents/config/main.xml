@@ -4,6 +4,7 @@
   <group name="General">
     <entry name="curvature" type="Double"><default>1.0</default><min>0.5</min><max>1.25</max></entry>
     <entry name="fullness" type="Double"><default>1.0</default><min>0.6</min><max>1.3</max></entry>
+    <entry name="bloom" type="Double"><default>1.0</default><min>0.0</min><max>1.5</max></entry>
     <entry name="palette" type="Int"><default>0</default><min>0</min><max>5</max></entry>
     <entry name="dynamicColor" type="Bool"><default>true</default></entry>
     <entry name="intensity" type="Double"><default>1.0</default><min>0.4</min><max>1.6</max></entry>
