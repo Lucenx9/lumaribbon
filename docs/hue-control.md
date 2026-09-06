@@ -2,6 +2,8 @@
 
 Date: 2026-09-06. Baseline: `b3f2904`.
 
+Historical report. The subsequent [palette behavior correction](palette-behavior.md) limits Hue shift to the Hue palette. The global rotation and Ember comparison below describe the earlier implementation.
+
 The **Hue palette** displays a complete spectrum along the ribbon: violet, blue, cyan, green, yellow, red and back to violet. All colors are present in one frame. Audio gently redistributes them without narrowing the palette or creating a time-driven cycle.
 
 ![Hue on dark and light backgrounds](images/hue-spectrum.png)

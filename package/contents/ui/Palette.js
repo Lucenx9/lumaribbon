@@ -77,13 +77,6 @@ function fromLch(lightness, chroma, hue) {
     }
     return Qt.rgba(encoded(rgb[0]), encoded(rgb[1]), encoded(rgb[2]), 1);
 }
-function rotateHue(color, degrees) {
-    if (degrees === 0) return color; // Preserve the original palette exactly.
-    const lch = toLch(color);
-    // The slider's two ends represent the same half turn.
-    const angle = degrees === 180 ? -180 : degrees;
-    return fromLch(lch[0], lch[1], lch[2] + angle * Math.PI / 180);
-}
 function createSpectrum(light, degrees) {
     // One complete color wheel across the ribbon, with an even perceived
     // lightness. Cache these six anchors and the matching final endpoint.

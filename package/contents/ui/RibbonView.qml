@@ -25,8 +25,9 @@ Item {
     readonly property real curveScale: isFinite(curvature) ? Math.max(0.5, Math.min(1.25, curvature)) : 1
     readonly property real fullnessScale: isFinite(fullness) ? Math.max(0.6, Math.min(1.3, fullness)) : 1
     readonly property real bloomStrength: isFinite(bloom) ? Math.max(0, Math.min(1.5, bloom)) : 1
-    readonly property real hueOffset: isFinite(hue) ? Math.max(-180, Math.min(180, hue)) : 0
     readonly property bool multicolor: paletteIndex === 6
+    // Keep the saved offset for Hue without recoloring any named preset.
+    readonly property real hueOffset: multicolor && isFinite(hue) ? Math.max(-180, Math.min(180, hue)) : 0
     readonly property var spectrumColors: Palette.createSpectrum(lightBackground, hueOffset)
     // Nominal host background, not a sampled screen pixel. No opaque backing is drawn.
     property color backdropColor: "#20242c"
@@ -49,12 +50,9 @@ Item {
         ? Qt.vector4d(0.25, 0.25, 0, 0.4)
         : Qt.vector4d(frame.arch, frame.counterBend, frame.bias, frame.opening)
     readonly property var paletteColors: Palette.colors(paletteIndex, lightBackground)
-    readonly property color basePrimaryColor: paletteColors[0]
-    readonly property color baseSecondaryColor: paletteColors[1]
-    readonly property color baseHighlightColor: paletteColors[2]
-    readonly property color primaryColor: Palette.rotateHue(basePrimaryColor, hueOffset)
-    readonly property color secondaryColor: Palette.rotateHue(baseSecondaryColor, hueOffset)
-    readonly property color highlightColor: Palette.rotateHue(baseHighlightColor, hueOffset)
+    readonly property color primaryColor: paletteColors[0]
+    readonly property color secondaryColor: paletteColors[1]
+    readonly property color highlightColor: paletteColors[2]
     readonly property var paletteRamp: Palette.createRamp(primaryColor, secondaryColor)
     // Timbre is smoothed once in the shared analyzer, not by per-view animations.
     // Older loaded plugins have no timbre fields and retain their fixed gradient.

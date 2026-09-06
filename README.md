@@ -21,7 +21,7 @@ Click the panel ribbon to open an enlarged view. Multiple instances in one Plasm
 
 ## Validation status
 
-See the [Hue palette and hue shift verification](docs/hue-control.md) for the latest checks, the [bloom report](docs/bloom-control.md) and [appearance controls report](docs/appearance-controls.md) for earlier settings work, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
+See the [palette behavior and Hue shift scope](docs/palette-behavior.md) for the latest checks, the [bloom report](docs/bloom-control.md) and [appearance controls report](docs/appearance-controls.md) for earlier settings work, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
 
 Prolonged use in the actual panel, hardware hot-plug, physical Bluetooth timing and mixed-monitor scaling remain open checks. Historical reports describe earlier versions and must not be read as a current compatibility matrix. Local build logs and raw recordings are excluded from this repository; source tests, written results and selected screenshots are included.
 
@@ -92,7 +92,7 @@ When upgrading a native plugin already loaded by `plasmashell`, a process can re
 | Aurora, Ember, Ice, Grove, Iris, Coral | Six curated palettes with bounded hue ranges; Grove stays green, Iris violet, and Coral moves from pink to orange |
 | Audio-reactive colors | Enabled by default; slowly shifts hue with the frequency balance. Disable for the original fixed gradient |
 | Hue palette | All hues together along the ribbon, with a gentle audio-driven shift in their distribution |
-| Hue shift | −180° to +180°, default 0°. Rotates the selected palette and its highlights, including audio-reactive colors |
+| Hue shift | −180° to +180°, default 0°. Visible only for the Hue palette. Rotates its spectrum; the other six presets retain their original colors |
 | Light intensity | Adjusts brightness without changing audio normalization |
 | Curvature | 50–125%, default 100%. Scales the broad audio-driven curve without speeding up movement |
 | Ribbon fullness | 60–130%, default 100%. Adjusts bundle thickness and filament spread |

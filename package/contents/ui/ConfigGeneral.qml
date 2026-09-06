@@ -106,6 +106,7 @@ KCM.SimpleKCM {
         AppearanceControl {
             id: hue
             objectName: "hueControl"
+            visible: root.cfg_palette === 6
             enabled: !root.updatePending
             Kirigami.FormData.label: qsTr("Hue shift:")
             accessibleName: qsTr("Hue shift")

@@ -162,6 +162,16 @@ private Q_SLOTS:
         QCOMPARE(preview->property("fullness").toDouble(), 1.15);
         QCOMPARE(preview->property("bloom").toDouble(), 0.65);
         QCOMPARE(preview->property("hue").toDouble(), -45.0);
+        auto *hueControl = page->findChild<QQuickItem *>(QStringLiteral("hueControl"));
+        QVERIFY(hueControl && hueControl->isVisible());
+        for (int palette = 0; palette < 6; ++palette) {
+            form->setProperty("cfg_palette", palette);
+            QTRY_VERIFY(!hueControl->isVisible());
+            QCOMPARE(preview->property("hueOffset").toDouble(), 0.0);
+        }
+        form->setProperty("cfg_palette", 6);
+        QTRY_VERIFY(hueControl->isVisible());
+        QCOMPARE(preview->property("hueOffset").toDouble(), -45.0);
         QCOMPARE(preview->property("fps").toInt(), 60);
         QVERIFY(!preview->property("reportStatus").toBool());
         const auto renderingStatus = audio->property("renderingStatus");
@@ -238,6 +248,13 @@ private Q_SLOTS:
         QTRY_COMPARE(popupRibbon->property("bloom").toDouble(), 0.0);
         QTRY_COMPARE(panelRibbon->property("hue").toDouble(), -90.0);
         QTRY_COMPARE(popupRibbon->property("hue").toDouble(), -90.0);
+        first->configuration()->insert(QStringLiteral("palette"), 1);
+        QTRY_COMPARE(panelRibbon->property("hueOffset").toDouble(), 0.0);
+        QTRY_COMPARE(popupRibbon->property("hueOffset").toDouble(), 0.0);
+        QCOMPARE(first->configuration()->value(QStringLiteral("hue")).toDouble(), -90.0);
+        first->configuration()->insert(QStringLiteral("palette"), 6);
+        QTRY_COMPARE(panelRibbon->property("hueOffset").toDouble(), -90.0);
+        QTRY_COMPARE(popupRibbon->property("hueOffset").toDouble(), -90.0);
         settingsWindow.hide();
         QTRY_VERIFY(!preview->property("renderActive").toBool());
         settingsWindow.show();
