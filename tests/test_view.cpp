@@ -61,6 +61,74 @@ public:
 class ViewTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void paletteIdentity_data() {
+        QTest::addColumn<int>("palette");
+        QTest::addColumn<bool>("fallback");
+        QTest::addColumn<bool>("light");
+        for (int palette : {1, 4}) {
+            for (bool fallback : {false, true}) {
+                for (bool light : {false, true}) {
+                    const auto tag = QString("%1-%2-%3").arg(palette == 1 ? "ember" : "iris")
+                        .arg(fallback ? "canvas" : "shader").arg(light ? "light" : "dark");
+                    QTest::newRow(qPrintable(tag)) << palette << fallback << light;
+                }
+            }
+        }
+    }
+    void paletteIdentity() {
+        QFETCH(int, palette);
+        QFETCH(bool, fallback);
+        QFETCH(bool, light);
+        TestAudio audio;
+        audio.phaseOverride = 0.65;
+        audio.spectralBalance = 0.98;
+        audio.trebleShare = 1;
+        audio.accents[2] = 1;
+        QQuickView view;
+        view.setColor(Qt::transparent);
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"paletteIndex", palette}, {"forceFallback", fallback},
+            {"backdropColor", QColor(light ? "#ffffff" : "#20242c")}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        view.resize(200, 40);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        // Stress the body and filament highlights with sustained treble and
+        // a treble accent together. This is a held renderer fixture.
+        auto frame = audio.sample(1);
+        frame.insert("treble", 1.0);
+        view.rootObject()->setProperty("frame", frame);
+        QTest::qWait(65);
+        const auto image = view.grabWindow();
+        QVERIFY(!image.isNull());
+        double red = 0, green = 0, blue = 0, weight = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                const auto color = image.pixelColor(x, y);
+                if (color.alpha() <= 40) continue;
+                const double alpha = color.alphaF();
+                red += alpha * color.redF();
+                green += alpha * color.greenF();
+                blue += alpha * color.blueF();
+                weight += alpha;
+            }
+        }
+        QVERIFY(weight > 30);
+        const auto mean = QColor::fromRgbF(red / weight, green / weight, blue / weight);
+        const double hue = mean.hsvHueF() * 360;
+        const auto lab = perceptualColor(mean);
+        const double chroma = std::hypot(lab[1], lab[2]);
+        qInfo() << "Highlighted body hue" << hue << "Oklab chroma" << chroma;
+        if (palette == 1) {
+            QVERIFY2(hue < 12 || hue > 350, "Ember's body should remain red with orange confined to brighter details.");
+        } else {
+            QVERIFY2(hue >= 250 && hue <= 280, "Iris should remain violet rather than becoming magenta.");
+            QVERIFY2(chroma > 0.10, "Iris highlights should retain color instead of washing the body out.");
+        }
+        QVERIFY(!view.rootObject()->property("shaderFailed").toBool());
+    }
     void multicolor_data() {
         QTest::addColumn<bool>("fallback");
         QTest::addColumn<bool>("light");

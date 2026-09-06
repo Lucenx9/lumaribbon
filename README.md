@@ -21,7 +21,7 @@ Click the panel ribbon to open an enlarged view. Multiple instances in one Plasm
 
 ## Validation status
 
-See the [palette behavior and Hue shift scope](docs/palette-behavior.md) for the latest checks, the [bloom report](docs/bloom-control.md) and [appearance controls report](docs/appearance-controls.md) for earlier settings work, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
+See the [Ember and Iris refinement](docs/ember-iris-refinement.md) for the latest checks and [palette behavior and Hue shift scope](docs/palette-behavior.md) for the preceding correction, the [bloom report](docs/bloom-control.md) and [appearance controls report](docs/appearance-controls.md) for earlier settings work, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
 
 Prolonged use in the actual panel, hardware hot-plug, physical Bluetooth timing and mixed-monitor scaling remain open checks. Historical reports describe earlier versions and must not be read as a current compatibility matrix. Local build logs and raw recordings are excluded from this repository; source tests, written results and selected screenshots are included.
 

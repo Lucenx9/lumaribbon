@@ -8,13 +8,13 @@ function names() {
 function colors(index, light) {
     switch (index) {
     case 1:
-        return light ? ["#9f1822", "#be3f1b", "#d9782d"] : ["#d62532", "#ff6530", "#ff9a3d"];
+        return light ? ["#9f1822", "#bf2d29", "#d9782d"] : ["#d62532", "#ff453b", "#ff9a3d"];
     case 2:
         return light ? ["#4568b7", "#257a9c", "#8acbdf"] : ["#6489d9", "#82d8ed", "#effcff"];
     case 3:
         return light ? ["#16724f", "#718f24", "#c5d994"] : ["#45b89a", "#b3da72", "#ecffd7"];
     case 4:
-        return light ? ["#6140a8", "#a84da9", "#d2aae3"] : ["#8060cc", "#d58cdf", "#f8e6ff"];
+        return light ? ["#6140a8", "#8657c9", "#b89bdd"] : ["#8060cc", "#b58bf0", "#dcc0ff"];
     case 5:
         return light ? ["#b7467b", "#c8753b", "#efb6a2"] : ["#e879aa", "#ffab79", "#ffe4df"];
     default:
