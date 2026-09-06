@@ -41,6 +41,8 @@ qt_add_shaders(lumaribbon ribbon_shaders PREFIX "/lumaribbon" BASE shaders FILES
 set(LUMA_PLUGIN_INSTALL_DIR "${KDE_INSTALL_PLUGINDIR}/plasma/applets" CACHE PATH "Plasma applet plugin directory")
 install(TARGETS lumaribbon DESTINATION "${LUMA_PLUGIN_INSTALL_DIR}")
 install(DIRECTORY package/ DESTINATION "${CMAKE_INSTALL_DATADIR}/plasma/plasmoids/org.kde.plasma.lumaribbon")
+install(FILES icons/hicolor/scalable/apps/org.kde.plasma.lumaribbon.svg
+    DESTINATION "${KDE_INSTALL_ICONDIR}/hicolor/scalable/apps")
 install(FILES README.md LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/lumaribbon")
 install(DIRECTORY docs/ DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/lumaribbon/docs")
 configure_file(cmake/uninstall.cmake.in uninstall.cmake @ONLY)
@@ -107,6 +109,9 @@ if(BUILD_TESTING)
         COMMAND "${CMAKE_COMMAND}" -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/package"
             "${CMAKE_BINARY_DIR}/test-data/plasma/plasmoids/org.kde.plasma.lumaribbon"
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/icons"
+            "${CMAKE_BINARY_DIR}/test-data/icons"
         COMMENT "Refreshing the Plasma test package")
     add_dependencies(test-plasma lumaribbon stage-luma-test-package)
     # Uses the staged package and the freshly built plugin, never the user's panel.

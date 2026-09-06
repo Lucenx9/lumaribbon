@@ -3,7 +3,7 @@
         "Id": "org.kde.plasma.lumaribbon",
         "Name": "Luma Ribbon",
         "Description": "A ribbon of light that follows music on the default audio output",
-        "Icon": "preferences-desktop-sound",
+        "Icon": "org.kde.plasma.lumaribbon",
         "Category": "Multimedia",
         "License": "GPL-3.0-or-later",
         "Version": "0.1.0",

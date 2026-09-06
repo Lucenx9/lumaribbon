@@ -2,6 +2,8 @@
 
 Panel plasmoid for KDE Plasma 6. One continuous, transparent ribbon driven by audio. Aurora, Ember, Ice, Grove, Iris, Coral and Hue palettes. No player, artwork, or additional effects.
 
+The widget icon is `org.kde.plasma.lumaribbon`, installed from `icons/hicolor/scalable/apps/` into the hicolor theme. Package and native metadata use the same name; CMake installation and the manifest-based uninstaller include the SVG.
+
 - **Monitor**: monitor ports of the default Audio/Sink node. Never a microphone source.
 - **Audio block**: 512 stereo float frames with sample rate and capture generation.
 - **Analyzer**: Qt-independent module accepting samples and returning normalized energy, bands, attacks and slow gated timbre descriptors for color.

@@ -1,3 +1,5 @@
+![Luma Ribbon icon](icons/hicolor/scalable/apps/org.kde.plasma.lumaribbon.svg)
+
 # Luma Ribbon
 
 A music-reactive light ribbon for the KDE Plasma 6 panel, built with C++20, Qt Quick and native PipeWire capture.
@@ -69,7 +71,7 @@ For a lean build, pass `-DBUILD_TESTING=OFF -DLUMA_BUILD_PREVIEW=OFF`. Shader To
 sudo cmake --install build
 ```
 
-Right-click your panel, choose **Add Widgets**, search for **Luma Ribbon**, and add it. This installs both the native plugin and the Plasma package. Installing only the `package/` directory with `kpackagetool6` is insufficient.
+Right-click your panel, choose **Add Widgets**, search for **Luma Ribbon**, and add it. CMake installs the native plugin, the Plasma package and its [ribbon icon](docs/widget-icon.md). Installing only the `package/` directory with `kpackagetool6` is insufficient.
 
 On Arch/CachyOS the files go to:
 
