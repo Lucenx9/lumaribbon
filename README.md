@@ -13,7 +13,7 @@ This screenshot is a native Qt Quick capture using synthetic audio analyzed by F
 - Draws a continuous transparent ribbon with soft light and fine filaments.
 - Uses bass for thickness and a broad arch, mids for curvature, and highs for luminous detail. Short attacks produce small ripples and independent band accents.
 - Changes its broad shape with the mix, with continuous transitions and shared state between panel and popup. Quiet passages settle; silence fades out.
-- Provides Aurora, Ember, Ice, Grove, Iris and Coral palettes. Optional audio-reactive colors stay within the selected palette.
+- Provides Aurora, Ember, Ice, Grove, Iris, Coral and Hue palettes. Hue displays a complete spectrum at once. Optional audio-reactive colors stay within the selected palette.
 - Adapts to horizontal and vertical panels, with 30/60 FPS limits, reduced motion and a simpler fallback renderer.
 - Passively captures the monitor of the default audio output. It never selects a microphone, plays sound or changes volume or routing.
 
@@ -21,7 +21,7 @@ Click the panel ribbon to open an enlarged view. Multiple instances in one Plasm
 
 ## Validation status
 
-See the [bloom control verification](docs/bloom-control.md) for the latest checks, the [appearance controls report](docs/appearance-controls.md) for the settings preview, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
+See the [Hue palette and hue shift verification](docs/hue-control.md) for the latest checks, the [bloom report](docs/bloom-control.md) and [appearance controls report](docs/appearance-controls.md) for earlier settings work, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
 
 Prolonged use in the actual panel, hardware hot-plug, physical Bluetooth timing and mixed-monitor scaling remain open checks. Historical reports describe earlier versions and must not be read as a current compatibility matrix. Local build logs and raw recordings are excluded from this repository; source tests, written results and selected screenshots are included.
 
@@ -91,6 +91,8 @@ When upgrading a native plugin already loaded by `plasmashell`, a process can re
 | --- | --- |
 | Aurora, Ember, Ice, Grove, Iris, Coral | Six curated palettes with bounded hue ranges; Grove stays green, Iris violet, and Coral moves from pink to orange |
 | Audio-reactive colors | Enabled by default; slowly shifts hue with the frequency balance. Disable for the original fixed gradient |
+| Hue palette | All hues together along the ribbon, with a gentle audio-driven shift in their distribution |
+| Hue shift | −180° to +180°, default 0°. Rotates the selected palette and its highlights, including audio-reactive colors |
 | Light intensity | Adjusts brightness without changing audio normalization |
 | Curvature | 50–125%, default 100%. Scales the broad audio-driven curve without speeding up movement |
 | Ribbon fullness | 60–130%, default 100%. Adjusts bundle thickness and filament spread |
@@ -102,7 +104,7 @@ When upgrading a native plugin already loaded by `plasmashell`, a process can re
 
 Reduced motion also follows Plasma's disabled-animation setting. Audio and rendering status appear in the configuration dialog. The panel remains a transparent ribbon without persistent error text. During silence, the empty panel space is still clickable.
 
-The configuration dialog previews draft settings at the widget's actual panel size and orientation, using the same audio source. The preview stays visible when the controls scroll. During silence it waits for audio; it does not generate a demonstration signal. **Apply** saves changes to the panel and popup; **Cancel** discards them. **Reset appearance** restores palette, audio-reactive colors, light intensity, curvature, fullness and bloom to their defaults. It leaves audio sensitivity, frame limit, reduced motion and simple rendering unchanged and still requires Apply.
+The configuration dialog previews draft settings at the widget's actual panel size and orientation, using the same audio source. The preview stays visible when the controls scroll. During silence it waits for audio; it does not generate a demonstration signal. **Apply** saves changes to the panel and popup; **Cancel** discards them. **Reset appearance** restores palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom to their defaults. It leaves audio sensitivity, frame limit, reduced motion and simple rendering unchanged and still requires Apply.
 
 Palette tints adapt to the theme's nominal background color: deeper colors on light surfaces, luminous colors on dark surfaces. This also applies to simple rendering and does not change the fade to silence.
 

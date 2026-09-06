@@ -3,7 +3,7 @@
 
 // Stable saved indices: append new palettes without reordering existing ones.
 function names() {
-    return ["Aurora", "Ember", "Ice", "Grove", "Iris", "Coral"];
+    return ["Aurora", "Ember", "Ice", "Grove", "Iris", "Coral", "Hue"];
 }
 function colors(index, light) {
     switch (index) {
@@ -31,8 +31,8 @@ function spreadLimit(index, light) {
 
 // Oklab matrices from Bjorn Ottosson's public-domain reference implementation:
 // https://bottosson.github.io/posts/oklab/ (2021-01-25 matrices).
-// Only createRamp performs color-space conversion and gamut mapping. Views
-// retain one 65-color ramp per palette/theme selection; sample only interpolates.
+// Conversion and gamut mapping happen when palette, theme or hue changes.
+// Views retain one 65-color ramp; audio-frame sampling only interpolates.
 function linear(x) {
     return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
 }
@@ -62,6 +62,38 @@ function toLinearRgb(lightness, chroma, hue) {
 function inGamut(rgb) {
     return rgb[0] >= 0 && rgb[0] <= 1 && rgb[1] >= 0 && rgb[1] <= 1 && rgb[2] >= 0 && rgb[2] <= 1;
 }
+function fromLch(lightness, chroma, hue) {
+    let rgb = toLinearRgb(lightness, chroma, hue);
+    if (!inGamut(rgb)) {
+        // Reduce chroma, retaining lightness and hue. Fixed work avoids
+        // clipping RGB channels into a different hue.
+        let low = 0, high = chroma;
+        for (let iteration = 0; iteration < 12; ++iteration) {
+            const candidate = (low + high) * 0.5;
+            if (inGamut(toLinearRgb(lightness, candidate, hue))) low = candidate;
+            else high = candidate;
+        }
+        rgb = toLinearRgb(lightness, low, hue);
+    }
+    return Qt.rgba(encoded(rgb[0]), encoded(rgb[1]), encoded(rgb[2]), 1);
+}
+function rotateHue(color, degrees) {
+    if (degrees === 0) return color; // Preserve the original palette exactly.
+    const lch = toLch(color);
+    // The slider's two ends represent the same half turn.
+    const angle = degrees === 180 ? -180 : degrees;
+    return fromLch(lch[0], lch[1], lch[2] + angle * Math.PI / 180);
+}
+function createSpectrum(light, degrees) {
+    // One complete color wheel across the ribbon, with an even perceived
+    // lightness. Cache these six anchors and the matching final endpoint.
+    const angle = degrees === 180 ? -180 : degrees;
+    const stops = [];
+    for (let i = 0; i < 6; ++i)
+        stops.push(fromLch(light ? 0.52 : 0.73, 0.14, (300 - i * 60 + angle) * Math.PI / 180));
+    stops.push(stops[0]);
+    return stops;
+}
 function createRamp(first, last) {
     const a = toLch(first), b = toLch(last);
     let hueDelta = b[2] - a[2];
@@ -73,26 +105,15 @@ function createRamp(first, last) {
         const lightness = a[0] + (b[0] - a[0]) * t;
         const chroma = a[1] + (b[1] - a[1]) * t;
         const hue = a[2] + hueDelta * t;
-        let rgb = toLinearRgb(lightness, chroma, hue);
-        if (!inGamut(rgb)) {
-            // Reduce chroma, retaining lightness and hue. A fixed iteration
-            // count bounds work and avoids clipping RGB into a different hue.
-            let low = 0, high = chroma;
-            for (let iteration = 0; iteration < 12; ++iteration) {
-                const candidate = (low + high) * 0.5;
-                if (inGamut(toLinearRgb(lightness, candidate, hue))) low = candidate;
-                else high = candidate;
-            }
-            rgb = toLinearRgb(lightness, low, hue);
-        }
-        ramp.push(Qt.rgba(encoded(rgb[0]), encoded(rgb[1]), encoded(rgb[2]), 1));
+        ramp.push(fromLch(lightness, chroma, hue));
     }
     ramp.push(last);
     return ramp;
 }
 function sample(ramp, position) {
-    const x = Math.max(0, Math.min(1, position)) * 64;
-    const index = Math.min(63, Math.floor(x));
+    const last = ramp.length - 1;
+    const x = Math.max(0, Math.min(1, position)) * last;
+    const index = Math.min(last - 1, Math.floor(x));
     const t = x - index, a = ramp[index], b = ramp[index + 1];
     return Qt.rgba(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, 1);
 }

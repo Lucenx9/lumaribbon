@@ -13,7 +13,7 @@ public:
     LumaApplet(QObject *parent, const KPluginMetaData &data, const QVariantList &args)
         : Plasma::Applet(parent, data, args), state(new AudioState(this)) {}
     QObject *audio() const { return state; }
-    int appearanceRevision() const { return 2; } // Curvature, fullness and bloom.
+    int appearanceRevision() const { return 3; } // Hue rotation and the multicolor palette.
     QSizeF previewSize() const { return m_previewSize; }
     void setPreviewSize(QSizeF size) {
         if (size.isEmpty() || size == m_previewSize) return;

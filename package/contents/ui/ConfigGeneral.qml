@@ -11,6 +11,7 @@ KCM.SimpleKCM {
     id: root
     property alias cfg_palette: palette.currentIndex
     property alias cfg_dynamicColor: dynamicColor.checked
+    property alias cfg_hue: hue.value
     property alias cfg_intensity: intensity.value
     property alias cfg_curvature: curvature.value
     property alias cfg_fullness: fullness.value
@@ -22,6 +23,7 @@ KCM.SimpleKCM {
     // Plasma also supplies the generated defaults from KConfigPropertyMap.
     property int cfg_paletteDefault: 0
     property bool cfg_dynamicColorDefault: true
+    property real cfg_hueDefault: 0
     property real cfg_intensityDefault: 1
     property real cfg_curvatureDefault: 1
     property real cfg_fullnessDefault: 1
@@ -31,12 +33,13 @@ KCM.SimpleKCM {
     property bool cfg_reducedMotionDefault
     property bool cfg_forceFallbackDefault
     readonly property var audio: Plasmoid.audio
-    readonly property bool updatePending: !!audio && !(Plasmoid.appearanceRevision >= 2)
+    readonly property bool updatePending: !!audio && !(Plasmoid.appearanceRevision >= 3)
     readonly property size previewSize: Plasmoid.previewSize === undefined ? Qt.size(200, 40) : Plasmoid.previewSize
 
     function resetAppearance() {
         cfg_palette = cfg_paletteDefault;
         cfg_dynamicColor = cfg_dynamicColorDefault;
+        cfg_hue = cfg_hueDefault;
         cfg_intensity = cfg_intensityDefault;
         cfg_curvature = cfg_curvatureDefault;
         cfg_fullness = cfg_fullnessDefault;
@@ -68,6 +71,7 @@ KCM.SimpleKCM {
                 backdropColor: Kirigami.Theme.backgroundColor
                 paletteIndex: root.cfg_palette
                 dynamicColor: root.cfg_dynamicColor
+                hue: root.cfg_hue
                 intensity: root.cfg_intensity
                 curvature: root.cfg_curvature
                 fullness: root.cfg_fullness
@@ -95,8 +99,21 @@ KCM.SimpleKCM {
     Kirigami.FormLayout {
         Controls.ComboBox {
             id: palette
+            enabled: !root.updatePending
             Kirigami.FormData.label: qsTr("Palette:")
             model: Palette.names()
+        }
+        AppearanceControl {
+            id: hue
+            objectName: "hueControl"
+            enabled: !root.updatePending
+            Kirigami.FormData.label: qsTr("Hue shift:")
+            accessibleName: qsTr("Hue shift")
+            from: -180; to: 180; stepSize: 1
+            degrees: true
+            defaultValue: root.cfg_hueDefault
+            lowText: qsTr("−180°")
+            highText: qsTr("+180°")
         }
         Controls.CheckBox {
             id: dynamicColor
@@ -158,12 +175,13 @@ KCM.SimpleKCM {
             icon.name: "edit-undo"
             enabled: !root.updatePending && (root.cfg_palette !== root.cfg_paletteDefault
                 || root.cfg_dynamicColor !== root.cfg_dynamicColorDefault
+                || Math.abs(root.cfg_hue - root.cfg_hueDefault) > 0.001
                 || Math.abs(root.cfg_intensity - root.cfg_intensityDefault) > 0.001
                 || Math.abs(root.cfg_curvature - root.cfg_curvatureDefault) > 0.001
                 || Math.abs(root.cfg_fullness - root.cfg_fullnessDefault) > 0.001
                 || Math.abs(root.cfg_bloom - root.cfg_bloomDefault) > 0.001)
             onClicked: root.resetAppearance()
-            Controls.ToolTip.text: qsTr("Resets palette, audio-reactive colors, light intensity, curvature, fullness and bloom. Apply to save.")
+            Controls.ToolTip.text: qsTr("Resets palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom. Apply to save.")
             Controls.ToolTip.visible: hovered
         }
         Kirigami.Separator { Kirigami.FormData.isSection: true }

@@ -29,6 +29,7 @@ PlasmoidItem {
         backdropColor: Kirigami.Theme.backgroundColor
         paletteIndex: Plasmoid.configuration.palette
         dynamicColor: Plasmoid.configuration.dynamicColor
+        hue: Plasmoid.configuration.hue
         intensity: Plasmoid.configuration.intensity
         curvature: Plasmoid.configuration.curvature
         fullness: Plasmoid.configuration.fullness

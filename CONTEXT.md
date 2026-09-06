@@ -1,6 +1,6 @@
 # Luma Ribbon
 
-Panel plasmoid for KDE Plasma 6. One continuous, transparent ribbon driven by audio. Aurora, Ember, Ice, Grove, Iris and Coral palettes. No player, artwork, or additional effects.
+Panel plasmoid for KDE Plasma 6. One continuous, transparent ribbon driven by audio. Aurora, Ember, Ice, Grove, Iris, Coral and Hue palettes. No player, artwork, or additional effects.
 
 - **Monitor**: monitor ports of the default Audio/Sink node. Never a microphone source.
 - **Audio block**: 512 stereo float frames with sample rate and capture generation.
@@ -9,5 +9,7 @@ Panel plasmoid for KDE Plasma 6. One continuous, transparent ribbon driven by au
 - **Ribbon motion**: worker-owned `RibbonMotion` turns band balance and phrase changes into a shared arch, counter-bend, bias and filament opening. Views never run their own springs.
 - **Ribbon view**: panel, popup or draft settings preview, sharing the shader and audio module. Per-instance curvature, fullness and bloom scale rendering only, leaving shared motion and analysis unchanged. Audio-reactive colors stay within the selected palette and can be disabled for the original fixed gradient.
 - **Settings preview**: uses the applet's existing AudioState and current logical panel size. Draft settings do not change the saved applet configuration or its renderer diagnostics. Apply persists them through Plasma's KConfigPropertyMap.
+- **Hue palette**: saved index 6 adds a complete simultaneous spectrum. Six cached OKLCH anchors and a repeated endpoint keep work bounded. Audio warps the color distribution slightly without cropping any hue or introducing a clock-driven cycle. The shader and Canvas share those anchors.
+- **Hue shift**: a per-instance offset in degrees rotates the chosen palette and highlights in OKLCH. Conversion and gamut mapping run when palette, theme or Hue changes; audio frames reuse the cached ramp. Zero preserves the original colors exactly.
 
 Priorities: passive monitor capture, bounded memory, stability, and visual quality at 200 × 40 pixels. Automated tests exercise the interfaces used by the application. Unperformed hardware checks must be identified explicitly. The interface and documentation are in English.

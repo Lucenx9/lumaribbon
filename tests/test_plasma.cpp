@@ -84,6 +84,9 @@ private Q_SLOTS:
             QCOMPARE(popupRibbon->property(key).toDouble(), 1.0);
         }
         QCOMPARE(first->property("previewSize").toSizeF(), QSizeF(200, 40));
+        QCOMPARE(first->configuration()->value(QStringLiteral("hue")).toDouble(), 0.0);
+        QCOMPARE(panelRibbon->property("hue").toDouble(), 0.0);
+        QCOMPARE(popupRibbon->property("hue").toDouble(), 0.0);
         QCOMPARE(first->configuration()->value(QStringLiteral("dynamicColorDefault")).toBool(), true);
         first->configuration()->insert(QStringLiteral("dynamicColor"), false);
         QTRY_VERIFY(!panelRibbon->property("dynamicColor").toBool());
@@ -105,6 +108,7 @@ private Q_SLOTS:
             {"cfg_curvature", 0.8}, {"cfg_fullness", 1.15}, {"cfg_bloom", 0.65},
             {"cfg_curvatureDefault", 1.0}, {"cfg_fullnessDefault", 1.0}, {"cfg_bloomDefault", 1.0},
             {"cfg_dynamicColor", true}, {"cfg_dynamicColorDefault", true},
+            {"cfg_hue", -45.0}, {"cfg_hueDefault", 0.0},
             {"cfg_fps", 60}, {"cfg_reducedMotion", false}, {"cfg_forceFallback", false},
             {"cfg_paletteDefault", 0}, {"cfg_intensityDefault", 1.0}, {"cfg_sensitivityDefault", 1.0},
             {"cfg_fpsDefault", 30}, {"cfg_reducedMotionDefault", false}, {"cfg_forceFallbackDefault", false}};
@@ -121,14 +125,14 @@ private Q_SLOTS:
         QVERIFY(!form->property("updatePending").toBool());
         QObject *paletteControl = nullptr;
         for (auto *child : form->findChildren<QObject *>()) {
-            if (child->metaObject()->indexOfProperty("currentText") >= 0 && child->property("count").toInt() == 6) {
+            if (child->metaObject()->indexOfProperty("currentText") >= 0 && child->property("count").toInt() == 7) {
                 paletteControl = child;
                 break;
             }
         }
         QVERIFY(paletteControl);
         const QStringList paletteNames{QStringLiteral("Aurora"), QStringLiteral("Ember"), QStringLiteral("Ice"),
-            QStringLiteral("Grove"), QStringLiteral("Iris"), QStringLiteral("Coral")};
+            QStringLiteral("Grove"), QStringLiteral("Iris"), QStringLiteral("Coral"), QStringLiteral("Hue")};
         for (int palette = 0; palette < paletteNames.size(); ++palette) {
             QVERIFY(form->setProperty("cfg_palette", palette));
             QCOMPARE(form->property("cfg_palette").toInt(), palette);
@@ -157,6 +161,7 @@ private Q_SLOTS:
         QCOMPARE(preview->property("curvature").toDouble(), 0.8);
         QCOMPARE(preview->property("fullness").toDouble(), 1.15);
         QCOMPARE(preview->property("bloom").toDouble(), 0.65);
+        QCOMPARE(preview->property("hue").toDouble(), -45.0);
         QCOMPARE(preview->property("fps").toInt(), 60);
         QVERIFY(!preview->property("reportStatus").toBool());
         const auto renderingStatus = audio->property("renderingStatus");
@@ -167,8 +172,9 @@ private Q_SLOTS:
         auto *curveSlider = page->findChild<QQuickItem *>(QStringLiteral("curvatureControlSlider"));
         auto *fullSlider = page->findChild<QQuickItem *>(QStringLiteral("fullnessControlSlider"));
         auto *bloomSlider = page->findChild<QQuickItem *>(QStringLiteral("bloomControlSlider"));
-        QVERIFY(curveSlider && fullSlider && bloomSlider);
-        for (auto *slider : {curveSlider, fullSlider, bloomSlider}) {
+        auto *hueSlider = page->findChild<QQuickItem *>(QStringLiteral("hueControlSlider"));
+        QVERIFY(curveSlider && fullSlider && bloomSlider && hueSlider);
+        for (auto *slider : {curveSlider, fullSlider, bloomSlider, hueSlider}) {
             const auto position = slider->mapToScene(QPointF(slider->width() * 0.8, slider->height() / 2)).toPoint();
             QVERIFY(position.y() > 0 && position.y() < settingsWindow.height());
             auto *handle = slider->property("handle").value<QQuickItem *>();
@@ -177,11 +183,12 @@ private Q_SLOTS:
             QTest::mousePress(&settingsWindow, Qt::LeftButton, Qt::NoModifier, start);
             QTest::mouseMove(&settingsWindow, position, 20);
             QVERIFY(slider->property("pressed").toBool());
-            const char *key = slider == curveSlider ? "curvature" : slider == fullSlider ? "fullness" : "bloom";
+            const char *key = slider == curveSlider ? "curvature" : slider == fullSlider ? "fullness"
+                : slider == bloomSlider ? "bloom" : "hue";
             QTRY_COMPARE(preview->property(key), slider->property("value"));
             QVERIFY(preview->property(key).toDouble() > 1.0);
-            QCOMPARE(panelRibbon->property(key).toDouble(), 1.0);
-            QCOMPARE(popupRibbon->property(key).toDouble(), 1.0);
+            QCOMPARE(panelRibbon->property(key).toDouble(), slider == hueSlider ? 0.0 : 1.0);
+            QCOMPARE(popupRibbon->property(key).toDouble(), slider == hueSlider ? 0.0 : 1.0);
             QTest::mouseRelease(&settingsWindow, Qt::LeftButton, Qt::NoModifier, position);
             slider->forceActiveFocus(Qt::TabFocusReason);
             QTRY_COMPARE(settingsWindow.activeFocusItem(), slider);
@@ -197,7 +204,7 @@ private Q_SLOTS:
         const auto resetPosition = reset->mapToScene(QPointF(reset->width() / 2, reset->height() / 2)).toPoint();
         QVERIFY(resetPosition.y() < settingsWindow.height());
         QTest::mouseClick(&settingsWindow, Qt::LeftButton, Qt::NoModifier, resetPosition);
-        for (const auto *key : {"palette", "dynamicColor", "intensity", "curvature", "fullness", "bloom"}) {
+        for (const auto *key : {"palette", "hue", "dynamicColor", "intensity", "curvature", "fullness", "bloom"}) {
             const QByteArray setting = QByteArray("cfg_") + key;
             QCOMPARE(form->property(setting), form->property(setting + "Default"));
         }
@@ -210,6 +217,8 @@ private Q_SLOTS:
         first->configuration()->insert(QStringLiteral("curvature"), 1.2);
         first->configuration()->insert(QStringLiteral("fullness"), 0.75);
         first->configuration()->insert(QStringLiteral("bloom"), 0.0);
+        first->configuration()->insert(QStringLiteral("hue"), -90.0);
+        first->configuration()->insert(QStringLiteral("palette"), 6);
         first->configuration()->writeConfig();
         corona.requireConfigSync();
         KConfig saved(settings.filePath(QStringLiteral("plasma-appletsrc")), KConfig::SimpleConfig);
@@ -219,10 +228,16 @@ private Q_SLOTS:
         QCOMPARE(general.readEntry("curvature", 0.0), 1.2);
         QCOMPARE(general.readEntry("fullness", 0.0), 0.75);
         QCOMPARE(general.readEntry("bloom", -1.0), 0.0);
+        QCOMPARE(general.readEntry("hue", 0.0), -90.0);
+        QCOMPARE(general.readEntry("palette", 0), 6);
+        QTRY_COMPARE(panelRibbon->property("paletteIndex").toInt(), 6);
+        QTRY_COMPARE(popupRibbon->property("paletteIndex").toInt(), 6);
         QTRY_COMPARE(panelRibbon->property("curvature").toDouble(), 1.2);
         QTRY_COMPARE(popupRibbon->property("fullness").toDouble(), 0.75);
         QTRY_COMPARE(panelRibbon->property("bloom").toDouble(), 0.0);
         QTRY_COMPARE(popupRibbon->property("bloom").toDouble(), 0.0);
+        QTRY_COMPARE(panelRibbon->property("hue").toDouble(), -90.0);
+        QTRY_COMPARE(popupRibbon->property("hue").toDouble(), -90.0);
         settingsWindow.hide();
         QTRY_VERIFY(!preview->property("renderActive").toBool());
         settingsWindow.show();
@@ -249,12 +264,12 @@ private Q_SLOTS:
         if (!settingsCapture.isEmpty()) {
             // A held fixture documents the controls without playing test sound.
             preview->setProperty("viewEnabled", false);
-            preview->setProperty("paletteIndex", 1);
+            preview->setProperty("paletteIndex", 6);
             preview->setProperty("reducedMotion", false);
             preview->setProperty("forceFallback", false);
             preview->setProperty("frame", QVariantMap{{"energy", 0.8}, {"bass", 0.6}, {"mid", 0.6}, {"treble", 0.4},
                 {"phase", 0.65}, {"onset", 0.0}, {"rippleAge", 10.0}, {"arch", 0.2}, {"counterBend", 1.0}, {"bias", 0.0}, {"opening", 0.7}});
-            form->setProperty("cfg_palette", 1);
+            form->setProperty("cfg_palette", 6);
             form->setProperty("cfg_reducedMotion", false);
             form->setProperty("cfg_forceFallback", false);
             QTest::mouseMove(&settingsWindow, QPoint(600, 520));
@@ -279,6 +294,7 @@ private Q_SLOTS:
         QCOMPARE(second->configuration()->value(QStringLiteral("curvature")).toDouble(), 1.0);
         QCOMPARE(second->configuration()->value(QStringLiteral("fullness")).toDouble(), 1.0);
         QCOMPARE(second->configuration()->value(QStringLiteral("bloom")).toDouble(), 1.0);
+        QCOMPARE(second->configuration()->value(QStringLiteral("hue")).toDouble(), 0.0);
         QPointer<QObject> secondAudio = second->property("audio").value<QObject *>();
         QVERIFY(secondAudio && secondAudio != audio);
         delete first;

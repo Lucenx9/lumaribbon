@@ -9,6 +9,7 @@ Item {
     required property var audio
     property int paletteIndex: 0
     property bool dynamicColor: true
+    property real hue: 0
     property real intensity: 1.0
     property real curvature: 1.0
     property real fullness: 1.0
@@ -24,6 +25,9 @@ Item {
     readonly property real curveScale: isFinite(curvature) ? Math.max(0.5, Math.min(1.25, curvature)) : 1
     readonly property real fullnessScale: isFinite(fullness) ? Math.max(0.6, Math.min(1.3, fullness)) : 1
     readonly property real bloomStrength: isFinite(bloom) ? Math.max(0, Math.min(1.5, bloom)) : 1
+    readonly property real hueOffset: isFinite(hue) ? Math.max(-180, Math.min(180, hue)) : 0
+    readonly property bool multicolor: paletteIndex === 6
+    readonly property var spectrumColors: Palette.createSpectrum(lightBackground, hueOffset)
     // Nominal host background, not a sampled screen pixel. No opaque backing is drawn.
     property color backdropColor: "#20242c"
     readonly property bool lightBackground: 0.2126 * backdropColor.r + 0.7152 * backdropColor.g
@@ -45,9 +49,12 @@ Item {
         ? Qt.vector4d(0.25, 0.25, 0, 0.4)
         : Qt.vector4d(frame.arch, frame.counterBend, frame.bias, frame.opening)
     readonly property var paletteColors: Palette.colors(paletteIndex, lightBackground)
-    readonly property color primaryColor: paletteColors[0]
-    readonly property color secondaryColor: paletteColors[1]
-    readonly property color highlightColor: paletteColors[2]
+    readonly property color basePrimaryColor: paletteColors[0]
+    readonly property color baseSecondaryColor: paletteColors[1]
+    readonly property color baseHighlightColor: paletteColors[2]
+    readonly property color primaryColor: Palette.rotateHue(basePrimaryColor, hueOffset)
+    readonly property color secondaryColor: Palette.rotateHue(baseSecondaryColor, hueOffset)
+    readonly property color highlightColor: Palette.rotateHue(baseHighlightColor, hueOffset)
     readonly property var paletteRamp: Palette.createRamp(primaryColor, secondaryColor)
     // Timbre is smoothed once in the shared analyzer, not by per-view animations.
     // Older loaded plugins have no timbre fields and retain their fixed gradient.
@@ -56,6 +63,9 @@ Item {
     readonly property real colorPosition: colorActive
         ? Math.max(0, Math.min(1, (frame.spectralBalance - 0.3) / 0.6)) : 0.5
     readonly property real colorBalance: colorPosition * colorPosition * (3 - 2 * colorPosition)
+    // Warp the distribution gently while retaining every hue at both extremes.
+    // There is no time-based color cycle, including with reduced motion.
+    readonly property real spectrumBias: multicolor && colorActive ? 0.32 * (2 * colorBalance - 1) : 0
     readonly property real colorHighlight: colorActive ? (frame.trebleShare || 0) : 0
     // Open the gradient around the same timbre-selected center. Mixed passages
     // span up to 41% of the ramp; the palette module owns per-palette limits.
@@ -74,6 +84,9 @@ Item {
         return Qt.rgba(a.r + (b.r - a.r) * amount, a.g + (b.g - a.g) * amount,
             a.b + (b.b - a.b) * amount, 1);
     }
+    function spectrumColor(position: real): color {
+        return Palette.sample(spectrumColors, position + spectrumBias * position * (1 - position));
+    }
     function refresh() {
         if (!audio) return;
         const next = audio.sample(sensitivity);
@@ -89,6 +102,9 @@ Item {
     onRenderActiveChanged: if (renderActive) refresh()
     onStartColorChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
     onEndColorChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
+    onMulticolorChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
+    onSpectrumColorsChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
+    onSpectrumBiasChanged: if (fallbackCanvas) fallbackCanvas.requestPaint()
     onFallbackChanged: {
         reportRendering();
         if (fallbackCanvas) fallbackCanvas.requestPaint();
@@ -137,6 +153,13 @@ Item {
                 property color colorA: root.startColor
                 property color colorB: root.endColor
                 property color colorC: root.highlightColor
+                property vector2d spectrum: Qt.vector2d(root.multicolor ? 1 : 0, root.spectrumBias)
+                property color spectrum0: root.spectrumColors[0]
+                property color spectrum1: root.spectrumColors[1]
+                property color spectrum2: root.spectrumColors[2]
+                property color spectrum3: root.spectrumColors[3]
+                property color spectrum4: root.spectrumColors[4]
+                property color spectrum5: root.spectrumColors[5]
                 fragmentShader: "qrc:/lumaribbon/ribbon.frag.qsb"
                 onStatusChanged: if (status === ShaderEffect.Error) root.shaderFailed = true
             }
@@ -160,8 +183,14 @@ Item {
                         * (root.reducedMotion ? 0.35 : 1) * root.curveScale;
                     const gradient = ctx.createLinearGradient(0, 0, width, 0);
                     gradient.addColorStop(0, "transparent");
-                    gradient.addColorStop(0.13, root.startColor);
-                    gradient.addColorStop(0.7, root.endColor);
+                    if (root.multicolor) {
+                        // Match the shader's distribution with bounded work.
+                        for (let i = 0; i <= 32; ++i)
+                            gradient.addColorStop(0.08 + 0.84 * i / 32, root.spectrumColor(i / 32));
+                    } else {
+                        gradient.addColorStop(0.13, root.startColor);
+                        gradient.addColorStop(0.7, root.endColor);
+                    }
                     gradient.addColorStop(1, "transparent");
                     ctx.lineCap = "round";
                     ctx.strokeStyle = gradient;

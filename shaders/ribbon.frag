@@ -16,6 +16,13 @@ layout(std140, binding = 0) uniform buf {
     vec4 colorC;
     vec2 appearance; // per-view curvature and fullness; both default to 1
     float bloom; // halo and veil amount; leaves filament geometry unchanged
+    vec2 spectrum; // multicolor palette enabled; audio-driven distribution bias
+    vec4 spectrum0;
+    vec4 spectrum1;
+    vec4 spectrum2;
+    vec4 spectrum3;
+    vec4 spectrum4;
+    vec4 spectrum5;
 };
 
 float gaussian(float distance, float width) {
@@ -24,6 +31,18 @@ float gaussian(float distance, float width) {
 }
 float filamentWeight(float f) {
     return 1.0 - 0.14 * abs(f) - 0.055 * f * f;
+}
+vec3 spectrumColor(float x) {
+    float p = clamp((x - 0.08) / 0.84, 0.0, 1.0);
+    p = (p + spectrum.y * p * (1.0 - p)) * 6.0;
+    // Fixed adjacent stops avoid jumping between opposite hues or wrapping
+    // away part of the spectrum when the frequency balance changes.
+    if (p < 1.0) return mix(spectrum0.rgb, spectrum1.rgb, p);
+    if (p < 2.0) return mix(spectrum1.rgb, spectrum2.rgb, p - 1.0);
+    if (p < 3.0) return mix(spectrum2.rgb, spectrum3.rgb, p - 2.0);
+    if (p < 4.0) return mix(spectrum3.rgb, spectrum4.rgb, p - 3.0);
+    if (p < 5.0) return mix(spectrum4.rgb, spectrum5.rgb, p - 4.0);
+    return mix(spectrum5.rgb, spectrum0.rgb, p - 5.0);
 }
 void main() {
     vec2 uv = qt_TexCoord0;
@@ -81,6 +100,10 @@ void main() {
     // shift the whole bundle in the opposite direction and flatten that curve.
     float bundleOffset = veilCenter / totalWeight - center;
     vec3 ribbonColor = mix(colorA.rgb, colorB.rgb, smoothstep(0.08, 0.92, x));
+    if (spectrum.x > 0.5) ribbonColor = spectrumColor(x);
+    // Multicolor highlights inherit their local hue rather than tinting the
+    // whole wheel toward a single palette accent.
+    vec3 highlight = spectrum.x > 0.5 ? mix(ribbonColor, vec3(1.0), 0.5) : colorC.rgb;
     float veil = gaussian(uv.y - center, (thickness * 1.8 + pixel) * taper) * bloom;
     sum += veil * ribbonColor * 0.18;
     density += veil * 0.18;
@@ -92,7 +115,7 @@ void main() {
         float core = gaussian(distance, coreWidth);
         float halo = gaussian(distance, (thickness * 0.62 + pixel) * taper) * bloom;
         float glint = accents.z * pow(0.5 + 0.5 * sin(x * 18.0 + f * 1.7 - t), 4.0);
-        vec3 tint = mix(ribbonColor, colorC.rgb, core * (0.14 + bands.w * 0.17 + glint * 0.2));
+        vec3 tint = mix(ribbonColor, highlight, core * (0.14 + bands.w * 0.17 + glint * 0.2));
         float light = (halo * 0.14 + core * (0.48 + glint * 0.12)) * filamentWeight(f);
         sum += tint * light;
         density += light;

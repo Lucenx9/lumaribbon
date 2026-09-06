@@ -7,9 +7,12 @@
 #include <QVariantMap>
 #include <QImage>
 #include <QJSValue>
+#include <QDir>
+#include <QTransform>
 #include <numbers>
 #include <cmath>
 #include <array>
+#include <limits>
 
 // Measure the displayed QColor in Oklab; do not reuse the palette generator.
 static std::array<double, 3> perceptualColor(QColor color) {
@@ -58,6 +61,232 @@ public:
 class ViewTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void multicolor_data() {
+        QTest::addColumn<bool>("fallback");
+        QTest::addColumn<bool>("light");
+        QTest::addColumn<QSize>("size");
+        for (bool fallback : {false, true}) {
+            for (bool light : {false, true}) {
+                for (const auto &size : {QSize(200, 40), QSize(40, 200), QSize(560, 260)}) {
+                    const auto tag = QString("%1-%2-%3x%4").arg(fallback ? "canvas" : "shader")
+                        .arg(light ? "light" : "dark").arg(size.width()).arg(size.height());
+                    QTest::newRow(qPrintable(tag)) << fallback << light << size;
+                }
+            }
+        }
+    }
+    void multicolor() {
+        QFETCH(bool, fallback);
+        QFETCH(bool, light);
+        QFETCH(QSize, size);
+        TestAudio audio;
+        audio.phaseOverride = 0.65;
+        QQuickView view;
+        view.setColor(Qt::transparent);
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"paletteIndex", 6}, {"forceFallback", fallback}, {"vertical", size.height() > size.width()},
+            {"backdropColor", QColor(light ? "#ffffff" : "#20242c")}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        view.resize(size);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject();
+        QVERIFY(root->property("multicolor").toBool());
+        const auto stops = root->property("spectrumColors").value<QJSValue>();
+        QCOMPARE(stops.property("length").toInt(), 7);
+        for (int i = 0; i < 7; ++i) {
+            const auto color = stops.property(i).toVariant().value<QColor>();
+            QVERIFY(color.isValid());
+            QCOMPARE(color.alpha(), 255);
+            const auto lab = perceptualColor(color);
+            QVERIFY(std::abs(lab[0] - (light ? 0.52 : 0.73)) < 0.002);
+            QVERIFY(std::hypot(lab[1], lab[2]) > 0.08);
+        }
+        QCOMPARE(stops.property(0).toVariant(), stops.property(6).toVariant());
+        QSignalSpy stopsChanged(root, SIGNAL(spectrumColorsChanged()));
+        const auto capture = [&] {
+            QMetaObject::invokeMethod(root, "refresh");
+            QTest::qWait(65);
+            return view.grabWindow().convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+        };
+        const auto colorSectors = [](const QImage &image) {
+            unsigned sectors = 0;
+            for (int y = 0; y < image.height(); ++y) {
+                for (int x = 0; x < image.width(); ++x) {
+                    const auto c = image.pixelColor(x, y);
+                    if (c.alpha() > 40 && c.hsvSaturationF() > 0.2)
+                        sectors |= 1u << std::min(5, int(c.hsvHueF() * 6));
+                }
+            }
+            return sectors;
+        };
+        audio.spectralBalance = 0.3;
+        const auto bass = capture();
+        QVERIFY(!bass.isNull());
+        QCOMPARE(colorSectors(bass), 63u); // All six hue sectors occur in one frame.
+        const auto directory = qEnvironmentVariable("LUMA_SPECTRUM_CAPTURE");
+        if (!directory.isEmpty())
+            QVERIFY(bass.save(QDir(directory).filePath(QString("%1.png").arg(QTest::currentDataTag()))));
+        audio.spectralBalance = 0.9;
+        const auto highs = capture();
+        QCOMPARE(colorSectors(highs), 63u); // Audio never narrows it to a single hue.
+        QVERIFY(highs != bass);
+        for (int y = 0; y < bass.height(); ++y)
+            for (int x = 0; x < bass.width(); ++x)
+                QCOMPARE(bass.constScanLine(y)[x * 4 + 3], highs.constScanLine(y)[x * 4 + 3]);
+        QTest::qWait(100);
+        QCOMPARE(capture(), highs); // No autonomous color cycling.
+        QCOMPARE(stopsChanged.count(), 0); // No gamut conversion on audio updates.
+        root->setProperty("dynamicColor", false);
+        const auto fixed = capture();
+        audio.spectralBalance = 0.3;
+        QCOMPARE(capture(), fixed);
+        root->setProperty("hue", 90.0);
+        const auto shifted = capture();
+        QVERIFY(shifted != fixed);
+        QCOMPARE(colorSectors(shifted), 63u);
+        QVERIFY(stopsChanged.count() > 0);
+        root->setProperty("hue", 0.0);
+        QCOMPARE(capture(), fixed);
+        root->setProperty("hue", 180.0);
+        const auto halfTurn = capture();
+        root->setProperty("hue", -180.0);
+        QCOMPARE(capture(), halfTurn);
+        root->setProperty("reducedMotion", true);
+        const auto reduced = capture();
+        audio.phaseOverride = 12;
+        QCOMPARE(capture(), reduced);
+        audio.silent = true;
+        const auto silent = capture();
+        for (int y = 0; y < silent.height(); ++y)
+            for (int x = 0; x < silent.width(); ++x) QCOMPARE(silent.constScanLine(y)[x * 4 + 3], 0);
+        QVERIFY(!root->property("shaderFailed").toBool());
+    }
+    void huePalette_data() { perceptualPalette_data(); }
+    void huePalette() {
+        QFETCH(int, palette);
+        QFETCH(bool, light);
+        TestAudio audio;
+        QQuickView view;
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"paletteIndex", palette}, {"backdropColor", QColor(light ? "#ffffff" : "#20242c")}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        auto *root = view.rootObject();
+        const std::array<const char *, 3> keys{"primaryColor", "secondaryColor", "highlightColor"};
+        std::array<QColor, 3> original;
+        for (size_t i = 0; i < keys.size(); ++i) original[i] = root->property(keys[i]).value<QColor>();
+        for (int degrees = -180; degrees <= 180; degrees += 5) {
+            root->setProperty("hue", degrees);
+            for (size_t i = 0; i < keys.size(); ++i) {
+                const auto color = root->property(keys[i]).value<QColor>();
+                QVERIFY(color.isValid() && color.alphaF() == 1.0);
+                for (double channel : {color.redF(), color.greenF(), color.blueF()})
+                    QVERIFY(std::isfinite(channel) && channel >= 0 && channel <= 1);
+                const auto base = perceptualColor(original[i]), shifted = perceptualColor(color);
+                const double baseChroma = std::hypot(base[1], base[2]);
+                const double chroma = std::hypot(shifted[1], shifted[2]);
+                QVERIFY2(std::abs(base[0] - shifted[0]) < 0.002, "Hue rotation must preserve Oklab lightness.");
+                QVERIFY(chroma <= baseChroma + 0.002);
+                QVERIFY2(chroma > baseChroma * 0.2, "Gamut mapping must retain a useful amount of color.");
+                const double expected = std::atan2(base[2], base[1]) + degrees * std::numbers::pi / 180;
+                const double error = std::remainder(std::atan2(shifted[2], shifted[1]) - expected, 2 * std::numbers::pi);
+                QVERIFY2(std::abs(error) < 0.02, "Gamut mapping must preserve the chosen hue angle.");
+            }
+        }
+        std::array<QColor, 3> halfTurn;
+        for (size_t i = 0; i < keys.size(); ++i) halfTurn[i] = root->property(keys[i]).value<QColor>();
+        for (double degrees : {-180.0, -900.0, 900.0}) {
+            root->setProperty("hue", degrees);
+            for (size_t i = 0; i < keys.size(); ++i) QCOMPARE(root->property(keys[i]).value<QColor>(), halfTurn[i]);
+        }
+        for (double degrees : {0.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()}) {
+            root->setProperty("hue", degrees);
+            for (size_t i = 0; i < keys.size(); ++i) QCOMPARE(root->property(keys[i]).value<QColor>(), original[i]);
+        }
+        root->setProperty("hue", 90.0);
+        QSignalSpy rampChanges(root, SIGNAL(paletteRampChanged()));
+        for (int i = 0; i < 30; ++i) {
+            audio.spectralBalance = 0.3 + 0.6 * i / 29;
+            QMetaObject::invokeMethod(root, "refresh");
+        }
+        QCOMPARE(rampChanges.count(), 0); // Rotation and gamut mapping stay outside audio-frame updates.
+        root->setProperty("hue", 45.0);
+        QVERIFY(rampChanges.count() > 0);
+        root->setProperty("dynamicColor", false);
+        QCOMPARE(root->property("startColor"), root->property("primaryColor"));
+        QCOMPARE(root->property("endColor"), root->property("secondaryColor"));
+    }
+    void hueRendering_data() { settingsRendering_data(); }
+    void hueRendering() {
+        QFETCH(int, palette);
+        QFETCH(bool, fallback);
+        TestAudio audio;
+        audio.phaseOverride = 0.65;
+        QQuickView view;
+        view.setColor(Qt::transparent);
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        const QSize size = palette % 3 == 0 ? QSize(560, 260) : palette % 3 == 1 ? QSize(200, 40) : QSize(40, 200);
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"paletteIndex", palette}, {"forceFallback", fallback}, {"vertical", size.height() > size.width()}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        view.resize(size);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject();
+        const auto grab = [&]() { QTest::qWait(65); return view.grabWindow().convertToFormat(QImage::Format_RGBA8888_Premultiplied); };
+        for (bool light : {false, true}) {
+            root->setProperty("backdropColor", QColor(light ? "#ffffff" : "#20242c"));
+            audio.spectralBalance = 0.35;
+            root->setProperty("hue", 0.0);
+            QMetaObject::invokeMethod(root, "refresh");
+            const auto original = grab();
+            QSignalSpy frameChanges(root, SIGNAL(frameChanged()));
+            const int calls = audio.calls;
+            for (double degrees : {-90.0, 90.0, 180.0}) {
+                root->setProperty("hue", degrees);
+                const auto shifted = grab();
+                QVERIFY(!shifted.isNull());
+                unsigned changed = 0;
+                for (int y = 0; y < shifted.height(); ++y) {
+                    for (int x = 0; x < shifted.width(); ++x) {
+                        const auto *a = original.constScanLine(y) + 4 * x;
+                        const auto *b = shifted.constScanLine(y) + 4 * x;
+                        QCOMPARE(a[3], b[3]); // Hue changes color, never geometry or fade.
+                        for (int c = 0; c < 3; ++c) changed += std::abs(a[c] - b[c]) > 3;
+                    }
+                }
+                QVERIFY(changed > 100);
+                const auto directory = qEnvironmentVariable("LUMA_HUE_CAPTURE");
+                if (!directory.isEmpty()) {
+                    const auto name = QString("%1-%2-%3.png").arg(QTest::currentDataTag()).arg(light ? "light" : "dark").arg(degrees);
+                    QVERIFY(shifted.save(QDir(directory).filePath(name)));
+                    QVERIFY(original.save(QDir(directory).filePath(QString("%1-%2-0.png").arg(QTest::currentDataTag()).arg(light ? "light" : "dark"))));
+                }
+            }
+            QCOMPARE(audio.calls, calls);
+            QCOMPARE(frameChanges.count(), 0);
+            QVERIFY(!root->property("shaderFailed").toBool());
+            const auto halfTurn = grab();
+            root->setProperty("hue", -180.0);
+            QCOMPARE(grab(), halfTurn);
+            root->setProperty("hue", 0.0);
+            QCOMPARE(grab(), original);
+            root->setProperty("hue", 90.0);
+            const auto low = grab();
+            audio.spectralBalance = 0.85;
+            QMetaObject::invokeMethod(root, "refresh");
+            QVERIFY(grab() != low); // Audio-reactive color still works after rotation.
+        }
+        audio.silent = true;
+        QMetaObject::invokeMethod(root, "refresh");
+        const auto silent = grab();
+        for (int y = 0; y < silent.height(); ++y)
+            for (int x = 0; x < silent.width(); ++x) QCOMPARE(silent.constScanLine(y)[x * 4 + 3], 0);
+    }
     void wakeFromSilence() {
         TestAudio audio;
         audio.silent = true;
