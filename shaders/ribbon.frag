@@ -122,7 +122,9 @@ void main() {
         float halo = gaussian(distance, (thickness * 0.62 + pixel) * taper) * bloom;
         float glint = accents.z * pow(0.5 + 0.5 * sin(x * 18.0 + f * 1.7 - t), 4.0);
         vec3 tint = mix(ribbonColor, highlight, core * (0.14 + bands.w * 0.17 + glint * 0.2));
-        float light = (halo * 0.14 + core * (0.48 + glint * 0.12)) * filamentWeight(f);
+        // Give the central filament definition at panel size without widening its glow.
+        float coreLight = i == 2 ? 0.64 : 0.48;
+        float light = (halo * 0.14 + core * (coreLight + glint * 0.12)) * filamentWeight(f);
         sum += tint * light;
         density += light;
     }

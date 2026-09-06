@@ -203,7 +203,7 @@ Item {
                     for (let layer = root.bloomStrength === 0 ? 7 : 0; layer < 8; ++layer) {
                         const depth = layer / 7;
                         ctx.globalAlpha = Math.min(1, Math.sqrt(e) * root.strength)
-                            * (layer === 7 ? 0.64 + 0.1 * root.accents.z
+                            * (layer === 7 ? 0.72 + 0.1 * root.accents.z
                                 : (0.018 + 0.075 * depth * depth) * root.bloomStrength);
                         ctx.lineWidth = layer === 7 ? Math.max(1.2, height * 0.018 * root.fullnessScale)
                             : glowWidth * (1 - depth * 0.88);
