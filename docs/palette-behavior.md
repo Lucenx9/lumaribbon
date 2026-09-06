@@ -2,7 +2,7 @@
 
 Date: 2026-09-06. Baseline: `685a165`.
 
-The later [Ember and Iris refinement](ember-iris-refinement.md) implements the two priority recommendations below. This report retains the earlier comparison.
+The later [Ember and Iris refinement](ember-iris-refinement.md) and [Grove refinement](grove-refinement.md) implement the recommendations below. This report retains the earlier comparison.
 
 Hue shift now belongs only to the Hue palette. Its slider appears when Hue is selected, and rotates that palette's complete spectrum. Switching to Aurora, Ember, Ice, Grove, Iris or Coral ignores the saved offset. Switching back to Hue restores it. The six presets keep their curated colors in both fixed and audio-reactive modes.
 
