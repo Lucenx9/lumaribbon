@@ -36,6 +36,7 @@ QVariantMap AudioState::sample(double sensitivity) const {
         {"spectralBalance", f.spectralBalance}, {"trebleShare", f.trebleShare},
         {"arch", snapshot.shape.arch}, {"counterBend", snapshot.shape.counterBend},
         {"bias", snapshot.shape.bias}, {"opening", snapshot.shape.opening},
+        {"lift", snapshot.shape.lift}, {"lean", snapshot.shape.lean},
         {"bassAccent", scale(f.accents[0])}, {"midAccent", scale(f.accents[1])}, {"trebleAccent", scale(f.accents[2])},
         {"time", snapshot.time}, {"rippleAge", f.rippleAge}, {"rippleOrigin", f.rippleOrigin}};
 }

@@ -23,6 +23,7 @@ layout(std140, binding = 0) uniform buf {
     vec4 spectrum3;
     vec4 spectrum4;
     vec4 spectrum5;
+    vec2 baseMotion; // slow audio-driven lift and lean, shared across views
 };
 
 float gaussian(float distance, float width) {
@@ -65,6 +66,11 @@ void main() {
     float counterBend = 2.5 * arch * (2.0 * u - 1.0);
     float body = (0.13 + 0.065 * bands.x + 0.02 * bands.y) * mix(1.0, 0.35, reduced) * appearance.x;
     float bend = -form.x * arch + form.y * counterBend;
+    // Move the veil and all filaments together; endpoints remain anchored.
+    // Reserve space for glow when sensitivity and curvature already fill the panel.
+    float baseRoom = 1.0 - smoothstep(0.25, 0.33, body * (abs(form.x) + 0.97 * abs(form.y)));
+    float baseBend = appearance.x * (-0.07 * baseMotion.x * arch
+        + 0.035 * baseMotion.y * counterBend) * baseRoom * (1.0 - reduced);
     // Keep fast mid attacks independent of the slow shape and shared ripple.
     // Match the Canvas expression. Peak displacement is < 0.024 of the height.
     float midAccentBend = 0.024 * accents.y * counterBend * (1.0 - reduced);
@@ -75,7 +81,7 @@ void main() {
     float wavefront = sqrt(originDistance * originDistance + 0.0016) - 0.04 - motion.z * 0.7;
     float ripple = sin(wavefront * 48.0) * gaussian(wavefront, 0.14)
                  * motion.y * 0.032 * (1.0 - reduced);
-    float center = 0.51 + body * bend + continuity + midAccentBend + ripple;
+    float center = 0.51 + body * bend + baseBend + continuity + midAccentBend + ripple;
     float thickness = (0.032 + 0.055 * bands.y + 0.014 * accents.x) * appearance.y;
     float pixel = 1.0 / max(resolution.y, 1.0);
     // Narrow the bundle as well as fading it, so the ends never form a blunt cap.

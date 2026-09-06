@@ -12,7 +12,7 @@ This screenshot is a native Qt Quick capture using synthetic audio analyzed by F
 
 - Draws a continuous transparent ribbon with soft light and fine filaments.
 - Uses bass for thickness and a broad arch, mids for curvature, and highs for luminous detail. Short attacks produce small ripples and independent band accents.
-- Changes its broad shape with the mix, with continuous transitions and shared state between panel and popup. Quiet passages settle; silence fades out.
+- Changes its broad shape with the mix. Slow loudness and timbre changes also lift and lean the base, with shared state between panel and popup. Quiet passages settle; silence fades out.
 - Provides Aurora, Ember, Ice, Grove, Iris, Coral and Hue palettes. Hue displays a complete spectrum at once. Optional audio-reactive colors stay within the selected palette.
 - Adapts to horizontal and vertical panels, with 30/60 FPS limits, reduced motion and a simpler fallback renderer.
 - Passively captures the monitor of the default audio output. It never selects a microphone, plays sound or changes volume or routing.
@@ -21,7 +21,7 @@ Click the panel ribbon to open an enlarged view. Multiple instances in one Plasm
 
 ## Validation status
 
-See the [Ember and Iris refinement](docs/ember-iris-refinement.md) for the latest checks and [palette behavior and Hue shift scope](docs/palette-behavior.md) for the preceding correction, the [bloom report](docs/bloom-control.md) and [appearance controls report](docs/appearance-controls.md) for earlier settings work, and the [panel depth report](docs/panel-depth.md) for the preceding motion change. The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
+See the [slow base motion report](docs/slow-base-motion.md) for the latest checks. Earlier reports cover [Ember and Iris](docs/ember-iris-refinement.md), [palette behavior and Hue shift scope](docs/palette-behavior.md), [bloom](docs/bloom-control.md), [appearance controls](docs/appearance-controls.md), and [panel depth](docs/panel-depth.md). The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
 
 Prolonged use in the actual panel, hardware hot-plug, physical Bluetooth timing and mixed-monitor scaling remain open checks. Historical reports describe earlier versions and must not be read as a current compatibility matrix. Local build logs and raw recordings are excluded from this repository; source tests, written results and selected screenshots are included.
 

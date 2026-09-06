@@ -47,7 +47,33 @@ QVariantMap analyzedMix(bool includeMids) {
     return {{"energy", f.energy}, {"bass", f.bass}, {"mid", f.mid}, {"treble", f.treble},
         {"phase", 0.65}, {"onset", 0.0}, {"rippleAge", 10.0}, {"rippleOrigin", 0.5},
         {"bassAccent", 0.0}, {"midAccent", 0.0}, {"trebleAccent", 0.0},
-        {"arch", shape.arch}, {"counterBend", shape.counterBend}, {"bias", shape.bias}, {"opening", shape.opening}};
+        {"arch", shape.arch}, {"counterBend", shape.counterBend}, {"bias", shape.bias}, {"opening", shape.opening},
+        {"lift", shape.lift}, {"lean", shape.lean}};
+}
+
+std::array<Luma::RibbonShape, 2> phraseExtremes() {
+    Luma::SignalAnalyzer analyzer;
+    Luma::RibbonMotion motion;
+    std::array<Luma::RibbonShape, 2> extremes;
+    std::array<Luma::StereoFrame, 480> block;
+    unsigned index = 0;
+    for (unsigned tick = 0; tick < 2400; ++tick) {
+        for (auto &frame : block) {
+            const double t = double(index++) / 48000;
+            // The spectrum stays balanced while an eight-second phrase swells.
+            const double level = 0.10 + 0.075 * std::sin(2 * std::numbers::pi * t / 8);
+            const float sample = level * (std::sin(2 * std::numbers::pi * 94 * t)
+                + 0.8 * std::sin(2 * std::numbers::pi * 740 * t)
+                + 0.5 * std::sin(2 * std::numbers::pi * 4800 * t));
+            frame = {sample, -sample};
+        }
+        analyzer.feed(block, 48000);
+        const auto shape = motion.advance(analyzer.features(), 0.01f);
+        if (tick < 800) continue;
+        if (shape.lift < extremes[0].lift) extremes[0] = shape;
+        if (shape.lift > extremes[1].lift) extremes[1] = shape;
+    }
+    return extremes;
 }
 
 QVariantMap restingFrame() {
@@ -119,6 +145,62 @@ double spread(const QImage &image) {
 class MotionViewTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void slowBaseMotion_data() {
+        QTest::addColumn<bool>("fallback");
+        QTest::addColumn<QSize>("size");
+        for (bool fallback : {false, true})
+            for (const auto &size : {QSize(160, 32), QSize(200, 40), QSize(240, 48), QSize(40, 200), QSize(432, 180)})
+                QTest::newRow(qPrintable(QString("%1-%2x%3").arg(fallback ? "canvas" : "shader")
+                    .arg(size.width()).arg(size.height()))) << fallback << size;
+    }
+    void slowBaseMotion() {
+        QFETCH(bool, fallback);
+        QFETCH(QSize, size);
+        static const auto phrases = phraseExtremes();
+        QVERIFY(phrases[0].lift < -0.25f && phrases[1].lift > 0.25f);
+        FrameAudio audio;
+        auto frame = restingFrame();
+        audio.current = frame;
+        QQuickView view;
+        view.setColor(Qt::transparent);
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        const bool vertical = size.width() < size.height();
+        view.setInitialProperties({{"audio", QVariant::fromValue(&audio)}, {"viewEnabled", false},
+            {"forceFallback", fallback}, {"dynamicColor", false}, {"vertical", vertical}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/RibbonView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        view.resize(size);
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        const auto legacy = capture(view, frame);
+        frame["lift"] = 0.0;
+        frame["lean"] = 0.0;
+        QCOMPARE(capture(view, frame), legacy); // An older loaded plugin stays compatible.
+        std::array<QImage, 2> images;
+        for (unsigned i = 0; i < 2; ++i) {
+            // Isolate the base: identical phase, fast shape, levels, colors and accents.
+            frame["lift"] = phrases[i].lift;
+            frame["lean"] = phrases[i].lean;
+            images[i] = capture(view, frame);
+            QVERIFY(!view.rootObject()->property("shaderFailed").toBool());
+            if (vertical) images[i] = images[i].transformed(QTransform().rotate(90));
+        }
+        double displacement = 0;
+        for (int x = images[0].width() / 5; x < images[0].width() * 4 / 5; ++x)
+            displacement = std::max(displacement, std::abs(center(images[0], x) - center(images[1], x)));
+        const double fraction = displacement / images[0].height();
+        qInfo() << "slow base displacement / height" << fraction;
+        QVERIFY2(fraction > 0.04, "Slow swells must move the base visibly, even at fixed band proportions.");
+        QVERIFY2(fraction < 0.15, "The extra movement must leave room for the ribbon and its glow.");
+        const double brightness = double(light(images[0])) / double(light(images[1]));
+        QVERIFY(brightness > 0.9 && brightness < 1.1);
+        view.rootObject()->setProperty("reducedMotion", true);
+        const auto reduced = capture(view, frame);
+        frame["lift"] = -1.0;
+        frame["lean"] = 1.0;
+        QCOMPARE(capture(view, frame), reduced);
+    }
+
     void bloomControl_data() {
         QTest::addColumn<bool>("fallback");
         QTest::addColumn<QSize>("size");
@@ -362,6 +444,8 @@ private Q_SLOTS:
         frame["counterBend"] = -0.15;
         frame["bias"] = 0.5;
         frame["opening"] = 0.3;
+        frame["lift"] = 0.6;
+        frame["lean"] = -0.4;
         const auto changed = capture(panel, frame);
         QVERIFY(changedChannels(first, changed) > 400);
         double displacement = 0;
@@ -375,11 +459,14 @@ private Q_SLOTS:
         QVERIFY(QTest::qWaitForWindowExposed(&popup));
         QTest::qWait(80);
         QCOMPARE(popup.rootObject()->property("shape"), panel.rootObject()->property("shape"));
+        QCOMPARE(popup.rootObject()->property("baseMotion"), panel.rootObject()->property("baseMotion"));
         QCOMPARE(popup.grabWindow().convertToFormat(QImage::Format_RGBA8888_Premultiplied), changed);
         popup.hide();
         QTest::qWait(30);
         QSignalSpy changes(popup.rootObject(), SIGNAL(frameChanged()));
         frame["arch"] = 0.7;
+        frame["lift"] = -0.5;
+        frame["lean"] = 0.7;
         const auto latest = capture(panel, frame);
         QTest::qWait(80);
         QCOMPARE(changes.count(), 0);
@@ -394,6 +481,8 @@ private Q_SLOTS:
         frame["counterBend"] = 1.0;
         frame["bias"] = -0.6;
         frame["opening"] = 0.9;
+        frame["lift"] = 0.8;
+        frame["lean"] = -0.9;
         frame["phase"] = 15.0;
         QCOMPARE(capture(panel, frame), reduced);
     }

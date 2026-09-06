@@ -31,6 +31,7 @@ public:
             {"rippleOrigin", f.rippleOrigin},
             {"spectralBalance", f.spectralBalance}, {"trebleShare", f.trebleShare},
             {"arch", shape.arch}, {"counterBend", shape.counterBend}, {"bias", shape.bias}, {"opening", shape.opening},
+            {"lift", shape.lift}, {"lean", shape.lean},
             {"bassAccent", scale(f.accents[0])}, {"midAccent", scale(f.accents[1])}, {"trebleAccent", scale(f.accents[2])}};
     }
 private:

@@ -49,6 +49,8 @@ Item {
     readonly property vector4d shape: reducedMotion || frame.arch === undefined
         ? Qt.vector4d(0.25, 0.25, 0, 0.4)
         : Qt.vector4d(frame.arch, frame.counterBend, frame.bias, frame.opening)
+    readonly property vector2d baseMotion: reducedMotion ? Qt.vector2d(0, 0)
+        : Qt.vector2d(frame.lift || 0, frame.lean || 0)
     readonly property var paletteColors: Palette.colors(paletteIndex, lightBackground)
     readonly property color primaryColor: paletteColors[0]
     readonly property color secondaryColor: paletteColors[1]
@@ -146,6 +148,7 @@ Item {
                 property vector4d accents: Qt.vector4d(root.accents.x, root.accents.y, root.accents.z,
                     root.frame.rippleOrigin === undefined ? 0.46 : root.frame.rippleOrigin)
                 property vector4d shape: root.shape
+                property vector2d baseMotion: root.baseMotion
                 property vector2d appearance: Qt.vector2d(root.curveScale, root.fullnessScale)
                 property real bloom: root.bloomStrength
                 property color colorA: root.startColor
@@ -179,6 +182,9 @@ Item {
                     const phase = root.reducedMotion ? 0.65 : root.frame.phase;
                     const body = (0.13 + 0.065 * e + 0.02 * root.frame.bass)
                         * (root.reducedMotion ? 0.35 : 1) * root.curveScale;
+                    const occupied = Math.max(0, Math.min(1, (body * (Math.abs(root.shape.x)
+                        + 0.97 * Math.abs(root.shape.y)) - 0.25) / 0.08));
+                    const baseRoom = 1 - occupied * occupied * (3 - 2 * occupied);
                     const gradient = ctx.createLinearGradient(0, 0, width, 0);
                     gradient.addColorStop(0, "transparent");
                     if (root.multicolor) {
@@ -210,8 +216,10 @@ Item {
                             const continuity = 0.018 * e * Math.sin(x * 6.283185 - phase * 0.73)
                                 * Math.pow(Math.max(0, Math.sin(x * Math.PI)), 0.72);
                             const midAccentBend = 0.024 * root.accents.y * counterBend;
+                            const baseBend = root.curveScale * (-0.07 * root.baseMotion.x * arch
+                                + 0.035 * root.baseMotion.y * counterBend) * baseRoom;
                             const y = height * (0.51 + body * (-root.shape.x * arch
-                                + root.shape.y * counterBend) + continuity + midAccentBend);
+                                + root.shape.y * counterBend) + baseBend + continuity + midAccentBend);
                             if (i === 0) ctx.moveTo(x * width, y); else ctx.lineTo(x * width, y);
                         }
                         ctx.stroke();

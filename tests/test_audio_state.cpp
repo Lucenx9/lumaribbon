@@ -77,7 +77,7 @@ private Q_SLOTS:
         QVERIFY(quiet["energy"].toDouble() > 0);
         QVERIFY(loud["energy"].toDouble() >= quiet["energy"].toDouble());
         QCOMPARE(quiet["rippleOrigin"], loud["rippleOrigin"]);
-        for (const char *key : {"arch", "counterBend", "bias", "opening"}) {
+        for (const char *key : {"arch", "counterBend", "bias", "opening", "lift", "lean"}) {
             QVERIFY(quiet.contains(key));
             QVERIFY(std::isfinite(quiet[key].toDouble()));
             QVERIFY(std::abs(quiet[key].toDouble() - loud[key].toDouble()) < 0.06);
@@ -90,7 +90,7 @@ private Q_SLOTS:
             QCOMPARE(captures.load(), 1u);
             const auto current = first->sample(0.5), joined = late.sample(2);
             QVERIFY(current["arch"].toDouble() > 0.5);
-            for (const char *key : {"arch", "counterBend", "bias", "opening"})
+            for (const char *key : {"arch", "counterBend", "bias", "opening", "lift", "lean"})
                 QVERIFY(std::abs(current[key].toDouble() - joined[key].toDouble()) < 0.003);
         }
         QVERIFY(awaitWithoutGui(false));
