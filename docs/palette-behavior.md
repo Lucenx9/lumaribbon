@@ -33,7 +33,7 @@ The following are visual recommendations, not additional changes in this patch:
 | Iris becomes pale magenta in bright passages. | Retain more violet in the body and reduce pale highlighting. | Make it read more consistently as violet. |
 | Coral moves from pink to peach. | Keep its current response. | The change matches its intended pink-to-orange range. |
 
-Ember and Iris are the first candidates for a future comparison. These are tuning opportunities, not failures of the audio analysis. The comparisons do not establish which instruments a song contains; color follows the frequency balance of the whole mix.
+The [Ember and Iris refinement](ember-iris-refinement.md) and [Grove refinement](grove-refinement.md) implement these tuning opportunities. The comparisons do not establish which instruments a song contains; color follows the frequency balance of the whole mix.
 
 ## Verification
 
