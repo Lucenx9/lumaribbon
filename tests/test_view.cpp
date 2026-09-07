@@ -65,10 +65,10 @@ private Q_SLOTS:
         QTest::addColumn<int>("palette");
         QTest::addColumn<bool>("fallback");
         QTest::addColumn<bool>("light");
-        for (int palette : {1, 4}) {
+        for (int palette : {1, 3, 4}) {
             for (bool fallback : {false, true}) {
                 for (bool light : {false, true}) {
-                    const auto tag = QString("%1-%2-%3").arg(palette == 1 ? "ember" : "iris")
+                    const auto tag = QString("%1-%2-%3").arg(palette == 1 ? "ember" : palette == 3 ? "grove" : "iris")
                         .arg(fallback ? "canvas" : "shader").arg(light ? "light" : "dark");
                     QTest::newRow(qPrintable(tag)) << palette << fallback << light;
                 }
@@ -123,6 +123,8 @@ private Q_SLOTS:
         qInfo() << "Highlighted body hue" << hue << "Oklab chroma" << chroma;
         if (palette == 1) {
             QVERIFY2(hue < 12 || hue > 350, "Ember's body should remain red with orange confined to brighter details.");
+        } else if (palette == 3) {
+            QVERIFY2(hue >= 105 && hue <= 155, "Grove's body should remain leaf green without becoming yellow-green lime.");
         } else {
             QVERIFY2(hue >= 250 && hue <= 280, "Iris should remain violet rather than becoming magenta.");
             QVERIFY2(chroma > 0.10, "Iris highlights should retain color instead of washing the body out.");

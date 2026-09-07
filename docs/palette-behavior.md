@@ -2,7 +2,7 @@
 
 Date: 2026-09-06. Baseline: `685a165`.
 
-The later [Ember and Iris refinement](ember-iris-refinement.md) implements the two priority recommendations below. This report retains the earlier comparison.
+The later [Ember and Iris refinement](ember-iris-refinement.md) and [Grove refinement](grove-refinement.md) implement the recommendations below. This report retains the earlier comparison.
 
 Hue shift now belongs only to the Hue palette. Its slider appears when Hue is selected, and rotates that palette's complete spectrum. Switching to Aurora, Ember, Ice, Grove, Iris or Coral ignores the saved offset. Switching back to Hue restores it. The six presets keep their curated colors in both fixed and audio-reactive modes.
 
@@ -33,7 +33,7 @@ The following are visual recommendations, not additional changes in this patch:
 | Iris becomes pale magenta in bright passages. | Retain more violet in the body and reduce pale highlighting. | Make it read more consistently as violet. |
 | Coral moves from pink to peach. | Keep its current response. | The change matches its intended pink-to-orange range. |
 
-Ember and Iris are the first candidates for a future comparison. These are tuning opportunities, not failures of the audio analysis. The comparisons do not establish which instruments a song contains; color follows the frequency balance of the whole mix.
+The [Ember and Iris refinement](ember-iris-refinement.md) and [Grove refinement](grove-refinement.md) implement these tuning opportunities. The comparisons do not establish which instruments a song contains; color follows the frequency balance of the whole mix.
 
 ## Verification
 

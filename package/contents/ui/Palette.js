@@ -12,7 +12,7 @@ function colors(index, light) {
     case 2:
         return light ? ["#4568b7", "#257a9c", "#8acbdf"] : ["#6489d9", "#82d8ed", "#effcff"];
     case 3:
-        return light ? ["#16724f", "#718f24", "#c5d994"] : ["#45b89a", "#b3da72", "#ecffd7"];
+        return light ? ["#16724f", "#529543", "#afdfa5"] : ["#45b89a", "#98e088", "#e8ffe3"];
     case 4:
         return light ? ["#6140a8", "#8657c9", "#b89bdd"] : ["#8060cc", "#b58bf0", "#dcc0ff"];
     case 5:
@@ -80,7 +80,7 @@ function fromLch(lightness, chroma, hue) {
 function createSpectrum(light, degrees) {
     // One complete color wheel across the ribbon, with an even perceived
     // lightness. Cache these six anchors and the matching final endpoint.
-    const angle = degrees === 180 ? -180 : degrees;
+    const angle = (typeof degrees === "number" && isFinite(degrees)) ? (degrees === 180 ? -180 : degrees) : 0;
     const stops = [];
     for (let i = 0; i < 6; ++i)
         stops.push(fromLch(light ? 0.52 : 0.73, 0.14, (300 - i * 60 + angle) * Math.PI / 180));

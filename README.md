@@ -23,7 +23,7 @@ Click the panel ribbon to open an enlarged view. Multiple instances in one Plasm
 
 ## Validation status
 
-See the [brighter core comparison](docs/brighter-core.md) and [slow base motion report](docs/slow-base-motion.md) for the latest rendering checks. Earlier reports cover [Ember and Iris](docs/ember-iris-refinement.md), [palette behavior and Hue shift scope](docs/palette-behavior.md), [bloom](docs/bloom-control.md), [appearance controls](docs/appearance-controls.md), and [panel depth](docs/panel-depth.md). The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
+See the [brighter core comparison](docs/brighter-core.md) and [slow base motion report](docs/slow-base-motion.md) for the latest rendering checks. Earlier reports cover [Grove](docs/grove-refinement.md), [Ember and Iris](docs/ember-iris-refinement.md), [palette behavior and Hue shift scope](docs/palette-behavior.md), [bloom](docs/bloom-control.md), [appearance controls](docs/appearance-controls.md), and [panel depth](docs/panel-depth.md). The [verification record](docs/verification.md) and [shared motion review](docs/shared-motion.md) retain earlier capture, recovery and sanitizer results.
 
 Prolonged use in the actual panel, hardware hot-plug, physical Bluetooth timing and mixed-monitor scaling remain open checks. Historical reports describe earlier versions and must not be read as a current compatibility matrix. Local build logs and raw recordings are excluded from this repository; source tests, written results and selected screenshots are included.
 
