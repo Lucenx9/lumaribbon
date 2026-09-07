@@ -10,6 +10,8 @@ PlasmoidItem {
     id: root
     readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
     readonly property bool panel: Plasmoid.formFactor === PlasmaCore.Types.Horizontal || vertical
+    readonly property int panelLength: Plasmoid.configuration.panelLength === undefined ? 120
+        : Math.max(80, Math.min(160, Plasmoid.configuration.panelLength))
     readonly property var audio: Plasmoid.audio
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     preferredRepresentation: panel ? compactRepresentation : fullRepresentation
@@ -20,7 +22,7 @@ PlasmoidItem {
     Binding {
         target: Plasmoid
         property: "previewSize"
-        value: root.panel ? Qt.size(root.width, root.height) : Qt.size(200, 40)
+        value: root.panel ? Qt.size(root.width, root.height) : Qt.size(root.panelLength, 40)
         when: Plasmoid.previewSize !== undefined
     }
 
@@ -40,12 +42,13 @@ PlasmoidItem {
         forceFallback: Plasmoid.configuration.forceFallback
     }
     compactRepresentation: Item {
-        Layout.minimumWidth: root.vertical ? 24 : 100
-        Layout.preferredWidth: root.vertical ? 40 : 200
-        Layout.maximumWidth: root.vertical ? Infinity : 300
-        Layout.minimumHeight: root.vertical ? 100 : 24
-        Layout.preferredHeight: root.vertical ? 200 : 40
-        Layout.maximumHeight: root.vertical ? 300 : Infinity
+        // Reserve a fixed length even during silence; only panel thickness can grow.
+        Layout.minimumWidth: root.vertical ? 24 : root.panelLength
+        Layout.preferredWidth: root.vertical ? 40 : root.panelLength
+        Layout.maximumWidth: root.vertical ? Infinity : root.panelLength
+        Layout.minimumHeight: root.vertical ? root.panelLength : 24
+        Layout.preferredHeight: root.vertical ? root.panelLength : 40
+        Layout.maximumHeight: root.vertical ? root.panelLength : Infinity
         ConfiguredRibbon { anchors.fill: parent; vertical: root.vertical }
         MouseArea {
             anchors.fill: parent

@@ -41,10 +41,10 @@ Rectangle {
                     required property string modelData
                     required property int index
                     spacing: 8
-                    Text { text: sampleColumn.modelData + " · 200 × 40"; color: "#a0aaba"; font.pixelSize: 12 }
+                    Text { text: sampleColumn.modelData + " · 120 × 40"; color: "#a0aaba"; font.pixelSize: 12 }
                     Rectangle {
                         width: 224; height: 64; radius: 8; color: "#232830"
-                        Sample { anchors.centerIn: parent; width: 200; height: 40; paletteIndex: sampleColumn.index }
+                        Sample { anchors.centerIn: parent; width: 120; height: 40; paletteIndex: sampleColumn.index }
                     }
                 }
             }
@@ -58,22 +58,22 @@ Rectangle {
             }
             Rectangle {
                 width: 64; height: 240; radius: 8; color: "#232830"
-                Sample { anchors.centerIn: parent; width: 40; height: 216; vertical: true }
+                Sample { anchors.centerIn: parent; width: 40; height: 120; vertical: true }
             }
         }
         Row {
             spacing: 24
             Rectangle {
                 width: 224; height: 64; radius: 8; color: "#ebedf0"
-                Sample { anchors.centerIn: parent; width: 200; height: 40; backdropColor: "#ebedf0" }
+                Sample { anchors.centerIn: parent; width: 120; height: 40; backdropColor: "#ebedf0" }
             }
             Rectangle {
                 width: 184; height: 64; radius: 8; color: "#232830"
-                Sample { anchors.centerIn: parent; width: 160; height: 32 }
+                Sample { anchors.centerIn: parent; width: 80; height: 32 }
             }
             Rectangle {
                 width: 264; height: 64; radius: 8; color: "#232830"
-                Sample { anchors.centerIn: parent; width: 240; height: 48 }
+                Sample { anchors.centerIn: parent; width: 160; height: 48 }
             }
         }
         Text { text: "Transparency on a light background · small panel · large panel"; color: "#8491a4"; font.pixelSize: 12 }

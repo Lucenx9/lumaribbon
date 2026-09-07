@@ -285,7 +285,7 @@ private Q_SLOTS:
         QTest::addColumn<bool>("fallback");
         QTest::addColumn<QSize>("size");
         for (bool fallback : {false, true})
-            for (const auto &size : {QSize(160, 32), QSize(200, 40), QSize(240, 48), QSize(40, 200), QSize(560, 260)})
+            for (const auto &size : {QSize(80, 32), QSize(120, 40), QSize(160, 48), QSize(40, 120), QSize(560, 260)})
                 QTest::newRow(qPrintable(QString("%1-%2x%3").arg(fallback ? "canvas" : "shader").arg(size.width()).arg(size.height())))
                     << fallback << size;
     }

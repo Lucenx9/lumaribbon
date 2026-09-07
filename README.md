@@ -91,6 +91,7 @@ When upgrading a native plugin already loaded by `plasmashell`, a process can re
 
 | Setting | Behavior |
 | --- | --- |
+| Panel length | 80–160 logical pixels, default 120. Sets width on horizontal panels and height on vertical panels; the preview follows draft changes |
 | Aurora, Ember, Ice, Grove, Iris, Coral | Six curated palettes with bounded hue ranges; Grove stays green, Iris violet, and Coral moves from pink to orange |
 | Audio-reactive colors | Enabled by default; slowly shifts hue with the frequency balance. Disable for the original fixed gradient |
 | Hue palette | All hues together along the ribbon, with a gentle audio-driven shift in their distribution |
@@ -106,11 +107,11 @@ When upgrading a native plugin already loaded by `plasmashell`, a process can re
 
 Reduced motion also follows Plasma's disabled-animation setting. Audio and rendering status appear in the configuration dialog. The panel remains a transparent ribbon without persistent error text. During silence, the empty panel space is still clickable.
 
-The configuration dialog previews draft settings at the widget's actual panel size and orientation, using the same audio source. The preview stays visible when the controls scroll. During silence it waits for audio; it does not generate a demonstration signal. **Apply** saves changes to the panel and popup; **Cancel** discards them. **Reset appearance** restores palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom to their defaults. It leaves audio sensitivity, frame limit, reduced motion and simple rendering unchanged and still requires Apply.
+The configuration dialog previews draft settings at the selected panel length and the widget's actual thickness and orientation, using the same audio source. The preview stays visible when the controls scroll. During silence it waits for audio; it does not generate a demonstration signal. **Apply** saves changes; **Cancel** discards them. Panel length affects only the compact view. **Reset appearance** restores panel length, palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom to their defaults. It leaves audio sensitivity, frame limit, reduced motion and simple rendering unchanged and still requires Apply.
 
 Palette tints adapt to the theme's nominal background color: deeper colors on light surfaces, luminous colors on dark surfaces. This also applies to simple rendering and does not change the fade to silence.
 
-The widget prefers 200 logical pixels along the panel and adapts to its actual thickness. A vertical panel rotates the same effect. Panel and popup share capture and analysis, as do multiple applets in the same `plasmashell` process. Each instance can use different visual settings.
+The widget reserves 120 logical pixels along the panel by default and adapts to its actual thickness. Its length stays fixed during playback and silence. Shortening the ribbon preserves filament thickness and shortens the faded tips; the expanded view keeps its larger dimensions. A vertical panel rotates the same effect. Panel and popup share capture and analysis, as do multiple applets in the same `plasmashell` process. Each instance can use different visual settings.
 
 ## Uninstall
 

@@ -5,10 +5,12 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import "Palette.js" as Palette
 
 KCM.SimpleKCM {
     id: root
+    property alias cfg_panelLength: panelLength.value
     property alias cfg_palette: palette.currentIndex
     property alias cfg_dynamicColor: dynamicColor.checked
     property alias cfg_hue: hue.value
@@ -21,6 +23,7 @@ KCM.SimpleKCM {
     property alias cfg_reducedMotion: reduced.checked
     property alias cfg_forceFallback: fallback.checked
     // Plasma also supplies the generated defaults from KConfigPropertyMap.
+    property int cfg_panelLengthDefault: 120
     property int cfg_paletteDefault: 0
     property bool cfg_dynamicColorDefault: true
     property real cfg_hueDefault: 0
@@ -33,10 +36,15 @@ KCM.SimpleKCM {
     property bool cfg_reducedMotionDefault
     property bool cfg_forceFallbackDefault
     readonly property var audio: Plasmoid.audio
-    readonly property bool updatePending: !!audio && !(Plasmoid.appearanceRevision >= 3)
-    readonly property size previewSize: Plasmoid.previewSize === undefined ? Qt.size(200, 40) : Plasmoid.previewSize
+    readonly property bool updatePending: !!audio && (!(Plasmoid.appearanceRevision >= 3)
+        || Plasmoid.configuration.panelLength === undefined)
+    readonly property bool verticalPanel: Plasmoid.formFactor === PlasmaCore.Types.Vertical
+    readonly property size panelSize: Plasmoid.previewSize === undefined ? Qt.size(120, 40) : Plasmoid.previewSize
+    readonly property size previewSize: verticalPanel ? Qt.size(panelSize.width, cfg_panelLength)
+        : Qt.size(cfg_panelLength, panelSize.height)
 
     function resetAppearance() {
+        cfg_panelLength = cfg_panelLengthDefault;
         cfg_palette = cfg_paletteDefault;
         cfg_dynamicColor = cfg_dynamicColorDefault;
         cfg_hue = cfg_hueDefault;
@@ -64,7 +72,7 @@ KCM.SimpleKCM {
                 anchors.centerIn: parent
                 width: root.previewSize.width * Math.min(1, parent.width / Math.max(1, root.previewSize.width))
                 height: root.previewSize.height * Math.min(1, parent.width / Math.max(1, root.previewSize.width))
-                vertical: root.previewSize.height > root.previewSize.width
+                vertical: root.verticalPanel
                 audio: root.audio
                 viewEnabled: !!root.audio && root.visible
                 reportStatus: false
@@ -97,6 +105,27 @@ KCM.SimpleKCM {
     }
 
     Kirigami.FormLayout {
+        RowLayout {
+            Kirigami.FormData.label: qsTr("Panel length:")
+            Controls.Slider {
+                id: panelLength
+                objectName: "panelLengthSlider"
+                Layout.preferredWidth: 220
+                Layout.fillWidth: true
+                enabled: !root.updatePending
+                from: 80; to: 160; stepSize: 8
+                value: root.cfg_panelLengthDefault
+                snapMode: Controls.Slider.SnapAlways
+                live: true
+                Accessible.name: qsTr("Panel length")
+                Accessible.description: qsTr("Default: %1 px. Applies along the panel, including vertical panels.").arg(root.cfg_panelLengthDefault)
+            }
+            Controls.Label {
+                text: qsTr("%1 px").arg(Math.round(panelLength.value))
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 3
+                horizontalAlignment: Text.AlignRight
+            }
+        }
         Controls.ComboBox {
             id: palette
             enabled: !root.updatePending
@@ -174,7 +203,8 @@ KCM.SimpleKCM {
             objectName: "resetAppearance"
             text: qsTr("Reset appearance")
             icon.name: "edit-undo"
-            enabled: !root.updatePending && (root.cfg_palette !== root.cfg_paletteDefault
+            enabled: !root.updatePending && (root.cfg_panelLength !== root.cfg_panelLengthDefault
+                || root.cfg_palette !== root.cfg_paletteDefault
                 || root.cfg_dynamicColor !== root.cfg_dynamicColorDefault
                 || Math.abs(root.cfg_hue - root.cfg_hueDefault) > 0.001
                 || Math.abs(root.cfg_intensity - root.cfg_intensityDefault) > 0.001
@@ -182,7 +212,7 @@ KCM.SimpleKCM {
                 || Math.abs(root.cfg_fullness - root.cfg_fullnessDefault) > 0.001
                 || Math.abs(root.cfg_bloom - root.cfg_bloomDefault) > 0.001)
             onClicked: root.resetAppearance()
-            Controls.ToolTip.text: qsTr("Resets palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom. Apply to save.")
+            Controls.ToolTip.text: qsTr("Resets panel length, palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom. Apply to save.")
             Controls.ToolTip.visible: hovered
         }
         Kirigami.Separator { Kirigami.FormData.isSection: true }

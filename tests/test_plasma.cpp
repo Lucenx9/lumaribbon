@@ -12,6 +12,7 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QQmlExpression>
 #include <QQuickWindow>
 #include <QPointer>
 #include <QTest>
@@ -54,13 +55,22 @@ private Q_SLOTS:
         QVERIFY(item);
         QVERIFY2(!first->failedToLaunch(), qPrintable(first->launchErrorMessage()));
         QQuickWindow window;
-        window.resize(200, 40);
+        window.resize(120, 40);
         item->setParentItem(window.contentItem());
-        item->setSize(QSizeF(200, 40));
+        item->setSize(QSizeF(120, 40));
         window.show();
         QVERIFY(QTest::qWaitForWindowExposed(&window));
         QTRY_VERIFY(item->compactRepresentationItem());
         QVERIFY(item->compactRepresentationItem()->isVisible());
+        const auto lengthHint = [&](const char *hint) {
+            auto *compact = item->compactRepresentationItem();
+            QQmlExpression expression(QQmlEngine::contextForObject(compact), compact,
+                QStringLiteral("Layout.%1").arg(QString::fromLatin1(hint)));
+            return expression.evaluate().toDouble();
+        };
+        QCOMPARE(first->configuration()->value(QStringLiteral("panelLength")).toInt(), 120);
+        for (const auto *hint : {"minimumWidth", "preferredWidth", "maximumWidth"})
+            QCOMPARE(lengthHint(hint), 120.0);
         QCOMPARE(item->property("audio").value<QObject *>(), audio.data());
         QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, QPoint(100, 20));
         QTRY_VERIFY(item->isExpanded());
@@ -83,7 +93,7 @@ private Q_SLOTS:
             QCOMPARE(panelRibbon->property(key).toDouble(), 1.0);
             QCOMPARE(popupRibbon->property(key).toDouble(), 1.0);
         }
-        QCOMPARE(first->property("previewSize").toSizeF(), QSizeF(200, 40));
+        QCOMPARE(first->property("previewSize").toSizeF(), QSizeF(120, 40));
         QCOMPARE(first->configuration()->value(QStringLiteral("hue")).toDouble(), 0.0);
         QCOMPARE(panelRibbon->property("hue").toDouble(), 0.0);
         QCOMPARE(popupRibbon->property("hue").toDouble(), 0.0);
@@ -104,6 +114,7 @@ private Q_SLOTS:
         // Plasma 6.7 passes the page title and every KConfigPropertyMap key,
         // including the generated *Default entries, as initial properties.
         const QVariantMap initialSettings{{"title", "Appearance"},
+            {"cfg_panelLength", 144}, {"cfg_panelLengthDefault", 120},
             {"cfg_palette", 0}, {"cfg_intensity", 1.2}, {"cfg_sensitivity", 1.5},
             {"cfg_curvature", 0.8}, {"cfg_fullness", 1.15}, {"cfg_bloom", 0.65},
             {"cfg_curvatureDefault", 1.0}, {"cfg_fullnessDefault", 1.0}, {"cfg_bloomDefault", 1.0},
@@ -156,7 +167,19 @@ private Q_SLOTS:
         auto *preview = page->findChild<QQuickItem *>(QStringLiteral("appearancePreview"));
         QVERIFY(preview);
         QCOMPARE(preview->property("audio").value<QObject *>(), audio.data());
-        QCOMPARE(preview->size(), QSizeF(200, 40));
+        QCOMPARE(preview->size(), QSizeF(144, 40));
+        // A length edit changes the draft, without resizing the live panel or popup.
+        const auto popupSize = item->fullRepresentationItem()->size();
+        auto *lengthSlider = page->findChild<QQuickItem *>(QStringLiteral("panelLengthSlider"));
+        QVERIFY(lengthSlider);
+        lengthSlider->forceActiveFocus(Qt::TabFocusReason);
+        QTRY_COMPARE(settingsWindow.activeFocusItem(), lengthSlider);
+        QTest::keyClick(&settingsWindow, Qt::Key_Left);
+        QTRY_COMPARE(form->property("cfg_panelLength").toInt(), 136);
+        QCOMPARE(preview->size(), QSizeF(136, 40));
+        QCOMPARE(lengthHint("preferredWidth"), 120.0);
+        QCOMPARE(first->configuration()->value(QStringLiteral("panelLength")).toInt(), 120);
+        QCOMPARE(item->fullRepresentationItem()->size(), popupSize);
         QTRY_VERIFY(preview->property("renderActive").toBool());
         QCOMPARE(preview->property("curvature").toDouble(), 0.8);
         QCOMPARE(preview->property("fullness").toDouble(), 1.15);
@@ -214,16 +237,19 @@ private Q_SLOTS:
         const auto resetPosition = reset->mapToScene(QPointF(reset->width() / 2, reset->height() / 2)).toPoint();
         QVERIFY(resetPosition.y() < settingsWindow.height());
         QTest::mouseClick(&settingsWindow, Qt::LeftButton, Qt::NoModifier, resetPosition);
-        for (const auto *key : {"palette", "hue", "dynamicColor", "intensity", "curvature", "fullness", "bloom"}) {
+        for (const auto *key : {"panelLength", "palette", "hue", "dynamicColor", "intensity", "curvature", "fullness", "bloom"}) {
             const QByteArray setting = QByteArray("cfg_") + key;
             QCOMPARE(form->property(setting), form->property(setting + "Default"));
         }
         QVERIFY(!reset->isEnabled());
+        QCOMPARE(preview->size(), QSizeF(120, 40));
         QCOMPARE(form->property("cfg_sensitivity").toDouble(), 1.5);
         QCOMPARE(form->property("cfg_fps").toInt(), 60);
         QVERIFY(form->property("cfg_reducedMotion").toBool());
         QVERIFY(form->property("cfg_forceFallback").toBool());
         // Mimic Apply through the same KConfigPropertyMap used by Plasma.
+        form->setProperty("cfg_panelLength", 160);
+        first->configuration()->insert(QStringLiteral("panelLength"), 160);
         first->configuration()->insert(QStringLiteral("curvature"), 1.2);
         first->configuration()->insert(QStringLiteral("fullness"), 0.75);
         first->configuration()->insert(QStringLiteral("bloom"), 0.0);
@@ -240,6 +266,10 @@ private Q_SLOTS:
         QCOMPARE(general.readEntry("bloom", -1.0), 0.0);
         QCOMPARE(general.readEntry("hue", 0.0), -90.0);
         QCOMPARE(general.readEntry("palette", 0), 6);
+        QCOMPARE(general.readEntry("panelLength", 0), 160);
+        for (const auto *hint : {"minimumWidth", "preferredWidth", "maximumWidth"})
+            QTRY_COMPARE(lengthHint(hint), 160.0);
+        QCOMPARE(item->fullRepresentationItem()->size(), popupSize);
         QTRY_COMPARE(panelRibbon->property("paletteIndex").toInt(), 6);
         QTRY_COMPARE(popupRibbon->property("paletteIndex").toInt(), 6);
         QTRY_COMPARE(panelRibbon->property("curvature").toDouble(), 1.2);
@@ -297,17 +327,23 @@ private Q_SLOTS:
         containment->setLocation(Plasma::Types::LeftEdge);
         containment->flushPendingConstraintsEvents();
         first->flushPendingConstraintsEvents();
-        window.resize(40, 200);
-        item->setSize(QSizeF(40, 200));
+        window.resize(40, 160);
+        item->setSize(QSizeF(40, 160));
         QTRY_VERIFY(item->property("vertical").toBool());
-        QTRY_COMPARE(first->property("previewSize").toSizeF(), QSizeF(40, 200));
-        QTRY_COMPARE(preview->size(), QSizeF(40, 200));
+        QTRY_COMPARE(first->property("previewSize").toSizeF(), QSizeF(40, 160));
+        QTRY_COMPARE(preview->size(), QSizeF(40, 160));
         QTRY_VERIFY(preview->property("vertical").toBool());
+        for (const auto *hint : {"minimumHeight", "preferredHeight", "maximumHeight"})
+            QTRY_COMPARE(lengthHint(hint), 160.0);
+        form->setProperty("cfg_panelLength", 80);
+        QTRY_COMPARE(preview->size(), QSizeF(40, 80));
+        QCOMPARE(lengthHint("preferredHeight"), 160.0);
         form.reset();
         settingsWindow.hide();
         QTest::qWait(80);
         auto *second = containment->createApplet(QStringLiteral("org.kde.plasma.lumaribbon"));
         QVERIFY(second && !second->failedToLaunch());
+        QCOMPARE(second->configuration()->value(QStringLiteral("panelLength")).toInt(), 120);
         QCOMPARE(second->configuration()->value(QStringLiteral("curvature")).toDouble(), 1.0);
         QCOMPARE(second->configuration()->value(QStringLiteral("fullness")).toDouble(), 1.0);
         QCOMPARE(second->configuration()->value(QStringLiteral("bloom")).toDouble(), 1.0);
