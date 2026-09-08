@@ -17,7 +17,7 @@ This is a native Plasma configuration component in an isolated Qt test window. T
 | Reverting appearance meant remembering earlier values. | Reset appearance restores five visual settings, pending Apply. | Experimenting is reversible without changing audio or accessibility preferences. |
 | Maximum curve, fullness and simultaneous attacks could carry the halo to the edge. | Both renderers keep an outer logical pixel clear and fade the remaining halo near the short edges. | The boundary does not leave a hard strip of clipped light. |
 
-The preview uses the widget's current logical dimensions and orientation. A desktop widget uses a nominal 200 × 40 panel preview. An oversized preview scales down to fit the configuration width. The preview stops sampling when hidden or minimized, and no synthetic movement replaces silence. A missing or failed monitor directs the user to the audio status below.
+The preview uses the widget's current logical dimensions and orientation. A desktop widget previews at the selected panel length (80–160 px, default 120) with the panel's actual thickness. An oversized preview scales down to fit the configuration width. The preview stops sampling when hidden or minimized, and no synthetic movement replaces silence. A missing or failed monitor directs the user to the audio status below.
 
 Apply uses Plasma's normal configuration flow. Cancel discards draft edits. Reset appearance affects palette, audio-reactive colors, light intensity, curvature and fullness. Sensitivity, frame limit, reduced motion and simple rendering remain unchanged. The two new defaults do not overwrite existing saved settings.
 
@@ -27,7 +27,7 @@ When upgrading an already loaded native plugin, Plasma may keep its old shader r
 
 `AppearanceControl.qml` keeps the two slider rows consistent while retaining native Qt Quick controls, keyboard handling and accessible names. `ConfigGeneral.qml` binds a third `RibbonView` to the applet's existing `AudioState`. Its `reportStatus` is false so testing a draft renderer does not overwrite panel diagnostics.
 
-`LumaApplet.previewSize` transfers the main representation's logical size to the configuration engine. It is transient UI state, not a saved setting or an audio property. It defaults to 200 × 40 for compatibility with a previously loaded plugin.
+`LumaApplet.previewSize` transfers the main representation's logical size to the configuration engine. It is transient UI state, not a saved setting or an audio property. It defaults to 120 × 40, matching the default panel length, for compatibility with a previously loaded plugin.
 
 The shader receives a per-view `appearance` uniform. Curvature scales the broad bend; fullness scales thickness, spread and filament core width. The Canvas renderer scales its matching curve and glow. QML clamps finite values to the same bounds as KConfig and replaces non-finite values with 100%. Capture, normalization, shared spring state, onset timing and palette definitions are unchanged.
 
@@ -43,7 +43,7 @@ Qt's [Slider documentation](https://doc.qt.io/qt-6/qml-qtquick-controls-slider.h
 - QML lint completes with only the expected static warnings for the native applet's custom `audio` and `previewSize` properties. Whitespace checks pass.
 - Local installation under `/usr` succeeds. All 58 installed files match the source or build output, and the installed native plugin passes the Plasma integration test in a fresh process. The existing `plasmashell` retains its previous library in memory until the next login; the session was not restarted.
 
-The rendered appearance regression covers all four range corners at sensitivity 200% and intensity 160%, with simultaneous maximum accents. It uses PCM analyzed by FFTW and the production motion controller. Cases cover 160 × 32, 200 × 40, 240 × 48, 40 × 200 and 560 × 260, in both renderers. Assertions check visible output, clear edges, increasing curvature and width, repaint without another audio sample, exact return to defaults, invalid values, reduced motion and silence.
+The rendered appearance regression covers all four range corners at sensitivity 200% and intensity 160%, with simultaneous maximum accents. It uses PCM analyzed by FFTW and the production motion controller. Cases cover 80 × 32, 120 × 40, 160 × 48, 40 × 120 and 560 × 260, in both renderers. Assertions check visible output, clear edges, increasing curvature and width, repaint without another audio sample, exact return to defaults, invalid values, reduced motion and silence.
 
 The Plasma integration test checks generated defaults, initial settings hydration, shared audio, independent draft values, mouse and keyboard updates, reset scope, persistence to a temporary configuration file, panel/popup propagation, hidden previews, actual vertical dimensions, independent widget settings and removal. It never writes the user's panel configuration.
 

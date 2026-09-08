@@ -24,7 +24,7 @@ Q_SIGNALS:
     void previewSizeChanged();
 private:
     AudioState *state;
-    QSizeF m_previewSize{200, 40};
+    QSizeF m_previewSize{120, 40};
 };
 K_PLUGIN_CLASS_WITH_JSON(LumaApplet, "native-metadata.json")
 #include "LumaApplet.moc"
