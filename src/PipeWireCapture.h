@@ -11,6 +11,7 @@ struct CaptureStatus {
     bool error = false;
     uint32_t rate = 0;
     uint32_t channels = 0;
+    QString detail{};
 };
 // Construct, maintain, and destroy on the analysis thread. No Qt event loop needed.
 class PipeWireCapture {

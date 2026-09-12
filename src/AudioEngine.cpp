@@ -88,7 +88,11 @@ void AudioEngine::run(std::stop_token stop) {
                         }, Qt::QueuedConnection);
                     }
                 }
-                std::this_thread::sleep_until(now + milliseconds(10));
+                // Without a negotiated stream, capture can only resume at the
+                // next routing poll. Keep the normal cadence through the fade
+                // and whenever audio can arrive, including a suspended sink.
+                const bool unavailable = next.status.error && next.status.rate == 0 && activity < 0.0005f;
+                std::this_thread::sleep_until(unavailable ? nextPoll : now + milliseconds(10));
             }
         } catch (const std::exception &e) {
             fail(QStringLiteral("Audio analysis unavailable: ") + QString::fromUtf8(e.what())

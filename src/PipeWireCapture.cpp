@@ -6,9 +6,11 @@
 #include <pipewire/pipewire.h>
 #include <pipewire/extensions/metadata.h>
 #include <spa/param/audio/format-utils.h>
+#include <spa/utils/result.h>
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cerrno>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -28,7 +30,7 @@ struct PipeWireCapture::Impl {
     spa_hook coreListener{}, registryListener{}, metadataListener{}, streamListener{};
     std::map<uint32_t, Sink> sinks;
     uint32_t metadataId = PW_ID_ANY;
-    QString defaultSink, connectedSerial;
+    QString defaultSink, connectedSerial, failureDetail;
     bool disconnected = false, streamFailed = false, badFormat = false;
     pw_stream_state streamState = PW_STREAM_STATE_UNCONNECTED;
     // Param negotiation is on the control loop, process on the RT thread.
@@ -46,9 +48,12 @@ struct PipeWireCapture::Impl {
     }
     ~Impl() { close(); }
 
-    static void coreError(void *data, uint32_t id, int, int res, const char *) {
+    static void coreError(void *data, uint32_t id, int, int res, const char *message) {
         auto &self = *static_cast<Impl *>(data);
-        if (id == PW_ID_CORE && res < 0) self.disconnected = true;
+        if (id == PW_ID_CORE && res < 0) {
+            self.failureDetail = QStringLiteral("%1 (%2)").arg(QString::fromUtf8(message ? message : spa_strerror(res)).left(512)).arg(res);
+            self.disconnected = true;
+        }
     }
     static int property(void *data, uint32_t subject, const char *key, const char *, const char *value) {
         auto &self = *static_cast<Impl *>(data);
@@ -91,11 +96,12 @@ struct PipeWireCapture::Impl {
             self.metadataWaitUntil = Clock::now() + std::chrono::seconds(1);
         }
     }
-    static void stateChanged(void *data, pw_stream_state, pw_stream_state state, const char *) {
+    static void stateChanged(void *data, pw_stream_state, pw_stream_state state, const char *message) {
         auto &self = *static_cast<Impl *>(data);
         self.streamState = state;
         if (state != PW_STREAM_STATE_STREAMING) self.generation.fetch_add(1, std::memory_order_relaxed);
         if (state == PW_STREAM_STATE_ERROR || state == PW_STREAM_STATE_UNCONNECTED) self.streamFailed = true;
+        if (state == PW_STREAM_STATE_ERROR && message) self.failureDetail = QString::fromUtf8(message).left(512);
     }
     static void paramChanged(void *data, uint32_t id, const spa_pod *param) {
         auto &self = *static_cast<Impl *>(data);
@@ -165,25 +171,28 @@ struct PipeWireCapture::Impl {
     }
     bool connect() {
         disconnected = false;
+        failureDetail.clear();
         defaultReceived = false;
         metadataWaitUntil = Clock::now() + std::chrono::seconds(1);
         loop = pw_thread_loop_new("luma-capture", nullptr);
-        if (!loop) return false;
+        if (!loop) { failureDetail = QString::fromUtf8(std::strerror(errno)); return false; }
         context = pw_context_new(pw_thread_loop_get_loop(loop), nullptr, 0);
-        if (!context) { close(); return false; }
+        if (!context) { failureDetail = QString::fromUtf8(std::strerror(errno)); close(); return false; }
         core = pw_context_connect(context, pw_properties_new(PW_KEY_APP_NAME, "Luma Ribbon", nullptr), 0);
-        if (!core) { close(); return false; }
+        if (!core) { failureDetail = QString::fromUtf8(std::strerror(errno)); close(); return false; }
         static const pw_core_events coreEvents = [] { pw_core_events e{}; e.version = PW_VERSION_CORE_EVENTS; e.error = coreError; return e; }();
         pw_core_add_listener(core, &coreListener, &coreEvents, this);
         registry = pw_core_get_registry(core, PW_VERSION_REGISTRY, 0);
-        if (!registry) { close(); return false; }
+        if (!registry) { failureDetail = QString::fromUtf8(std::strerror(errno)); close(); return false; }
         static const pw_registry_events registryEvents = [] { pw_registry_events e{}; e.version = PW_VERSION_REGISTRY_EVENTS; e.global = global; e.global_remove = removed; return e; }();
         pw_registry_add_listener(registry, &registryListener, &registryEvents, this);
-        if (pw_thread_loop_start(loop) < 0) { close(); return false; }
+        const int started = pw_thread_loop_start(loop);
+        if (started < 0) { failureDetail = QString::fromUtf8(spa_strerror(started)); close(); return false; }
         return true;
     }
     void createStream(const Sink &sink) {
         retryError = false;
+        failureDetail.clear();
         const auto serial = sink.serial.toUtf8();
         stream = pw_stream_new(core, "Luma Ribbon · monitor", pw_properties_new(
             PW_KEY_MEDIA_TYPE, "Audio", PW_KEY_MEDIA_CATEGORY, "Capture", PW_KEY_MEDIA_ROLE, "Music",
@@ -191,7 +200,7 @@ struct PipeWireCapture::Impl {
             PW_KEY_STREAM_CAPTURE_SINK, "true", PW_KEY_TARGET_OBJECT, serial.constData(),
             "node.dont-fallback", "true", PW_KEY_NODE_DONT_RECONNECT, "true",
             "node.dont-move", "true", PW_KEY_NODE_PASSIVE, "true", nullptr));
-        if (!stream) { streamFailed = true; return; }
+        if (!stream) { failureDetail = QString::fromUtf8(std::strerror(errno)); streamFailed = true; return; }
         static const pw_stream_events events = [] {
             pw_stream_events e{}; e.version = PW_VERSION_STREAM_EVENTS;
             e.state_changed = stateChanged; e.param_changed = paramChanged; e.process = process; return e;
@@ -209,7 +218,8 @@ struct PipeWireCapture::Impl {
         const spa_pod *params[] = {spa_format_audio_raw_build(&builder, SPA_PARAM_EnumFormat, &info)};
         const auto flags = pw_stream_flags(PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_RT_PROCESS);
         connectedSerial = sink.serial;
-        if (pw_stream_connect(stream, PW_DIRECTION_INPUT, PW_ID_ANY, flags, params, 1) < 0) streamFailed = true;
+        const int connected = pw_stream_connect(stream, PW_DIRECTION_INPUT, PW_ID_ANY, flags, params, 1);
+        if (connected < 0) { failureDetail = QString::fromUtf8(spa_strerror(connected)); streamFailed = true; }
     }
     CaptureStatus poll() {
         const auto now = Clock::now();
@@ -217,7 +227,7 @@ struct PipeWireCapture::Impl {
             if (now < retryAt) return status;
             if (!connect()) {
                 retryAt = now + std::chrono::seconds(2);
-                return status = {QStringLiteral("PipeWire is unavailable. Reconnecting automatically."), {}, true};
+                return status = {QStringLiteral("PipeWire is unavailable. Reconnecting automatically."), {}, true, 0, 0, failureDetail};
             }
         }
         pw_thread_loop_lock(loop);
@@ -230,7 +240,7 @@ struct PipeWireCapture::Impl {
             unlock.value = nullptr;
             close();
             retryAt = now + std::chrono::seconds(1);
-            return status = {QStringLiteral("The PipeWire connection was interrupted. Reconnecting automatically."), {}, true};
+            return status = {QStringLiteral("The PipeWire connection was interrupted. Reconnecting automatically."), {}, true, 0, 0, failureDetail};
         }
         const Sink *target = nullptr;
         for (const auto &[id, sink] : sinks) {
@@ -256,7 +266,8 @@ struct PipeWireCapture::Impl {
             status = {badFormat ? QStringLiteral("Unsupported audio format. Stereo float PCM at 8–192 kHz is required.")
                 : error ? QStringLiteral("Cannot read the audio monitor. Check PipeWire and WirePlumber. The connection will be retried.")
                 : streamState == PW_STREAM_STATE_STREAMING ? QStringLiteral("Audio monitor connected.")
-                : QStringLiteral("Waiting for audio on the default output."), target->description, error, f >> 4, f & 15};
+                : QStringLiteral("Waiting for audio on the default output."), target->description, error, f >> 4, f & 15,
+                error ? failureDetail : QString()};
         }
         return status;
     }

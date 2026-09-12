@@ -1,5 +1,7 @@
 # Verification record
 
+The [reliability review](reliability-review.md) records the 2026-09-12 CI, headless-build, diagnostics, keyboard and actual configuration-dialog checks on Debian 13. The [release procedure](release-validation.md) separates automated checks from pending hardware validation.
+
 The [panel-depth pass](panel-depth.md) records the correction for flat mixed-band shapes, wider filaments and soft panel edges. The complete suite passes 10/10, with 50 motion-view entries including the new PCM-to-render regressions.
 
 The [PR 1 review](pr-1-review.md) records the 2026-09-06 hardening checks and added exception/motion regressions. Its complete suite passes 10/10; the records below describe earlier passes.

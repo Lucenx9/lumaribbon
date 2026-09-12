@@ -12,6 +12,7 @@
 namespace {
 std::atomic<bool> playTone{false};
 std::atomic<unsigned> captures{0};
+std::atomic<bool> captureUnavailable{false}, overflowNextPoll{false}, expireNextPoll{false};
 using Clock = std::chrono::steady_clock;
 }
 
@@ -27,6 +28,8 @@ struct PipeWireCapture::Impl {
 PipeWireCapture::PipeWireCapture(AudioRing &ring) : impl(std::make_unique<Impl>(ring)) {}
 PipeWireCapture::~PipeWireCapture() = default;
 CaptureStatus PipeWireCapture::poll() {
+    if (captureUnavailable.load())
+        return {QStringLiteral("Test capture unavailable"), {}, true, 0, 0, QStringLiteral("Permission denied (13)")};
     const bool playing = playTone.load();
     // The format change resets the analyzer, allowing repeated audible/silent
     // transitions while the GUI is deliberately blocked for this queue test.
@@ -35,9 +38,12 @@ CaptureStatus PipeWireCapture::poll() {
         const float sample = playing ? 0.2f * std::sin(6.283185307179586 * 100 * n / rate) : 0;
         impl->frames[n] = {sample, -sample};
     }
-    impl->ingress.write(reinterpret_cast<const char *>(impl->frames.data()), rate / 10,
-        sizeof(StereoFrame), rate, playing ? 1 : 2,
-        std::chrono::duration<double>(Clock::now().time_since_epoch()).count());
+    const double receivedAt = std::chrono::duration<double>(Clock::now().time_since_epoch()).count()
+        - (expireNextPoll.exchange(false) ? 5.0 : 0.0);
+    const unsigned batches = overflowNextPoll.exchange(false) ? 4 : 1;
+    for (unsigned n = 0; n < batches; ++n)
+        impl->ingress.write(reinterpret_cast<const char *>(impl->frames.data()), rate / 10,
+            sizeof(StereoFrame), rate, playing ? 1 : 2, receivedAt);
     return {QStringLiteral("Test capture"), QStringLiteral("Synthetic"), false, rate, 2};
 }
 }
@@ -45,6 +51,44 @@ CaptureStatus PipeWireCapture::poll() {
 class AudioStateTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void unavailableRecoveryAndDiagnostics() {
+        captureUnavailable.store(true);
+        playTone.store(false);
+        auto state = std::make_unique<AudioState>();
+        auto engine = Luma::AudioEngine::acquire();
+        QSignalSpy changes(state.get(), &AudioState::diagnosticsChanged);
+        QTRY_VERIFY(state->hasError());
+        QVERIFY(state->diagnostics().contains(QStringLiteral("Permission denied (13)")));
+        QVERIFY(state->diagnostics().contains(QStringLiteral("Dropped audio blocks: 0")));
+        QCOMPARE(state->sample()["energy"].toDouble(), 0.0);
+        QSignalSpy wake(state.get(), &AudioState::audioAvailable);
+        captureUnavailable.store(false);
+        playTone.store(true);
+        QTRY_VERIFY_WITH_TIMEOUT(state->sample()["energy"].toDouble() > 0.1, 500);
+        QTRY_COMPARE(wake.count(), 1);
+        QTRY_VERIFY(!state->hasError());
+        QVERIFY(!state->diagnostics().contains(QStringLiteral("Permission denied")));
+        QVERIFY(state->diagnostics().contains(QStringLiteral("48000 Hz")));
+        state->reportRendering(true);
+        QVERIFY(state->diagnostics().contains(QStringLiteral("Simple rendering")));
+        overflowNextPoll.store(true);
+        QTRY_VERIFY(engine->snapshot().dropped > 0);
+        QTRY_VERIFY(!state->diagnostics().contains(QStringLiteral("Dropped audio blocks: 0")));
+        expireNextPoll.store(true);
+        QTRY_VERIFY(engine->snapshot().expired > 0);
+        QTRY_VERIFY(!state->diagnostics().contains(QStringLiteral("Expired audio blocks: 0")));
+        QVERIFY(changes.count() >= 4);
+        captureUnavailable.store(true);
+        playTone.store(false);
+        QTRY_VERIFY(state->hasError());
+        QTRY_VERIFY_WITH_TIMEOUT(state->sample()["energy"].toDouble() < 0.0005, 5000);
+        const auto removal = Clock::now();
+        state.reset();
+        engine.reset();
+        QVERIFY(Clock::now() - removal < std::chrono::milliseconds(500));
+        QCOMPARE(captures.load(), 0u);
+        captureUnavailable.store(false);
+    }
     void coalescedWakeAndRemoval() {
         auto first = std::make_unique<AudioState>();
         auto second = std::make_unique<AudioState>();

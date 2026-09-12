@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Analysis without Qt / ASan and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libfftw3-dev
+      - name: Build without desktop dependencies
+        run: |
+          cmake -S . -B build -DLUMA_ANALYSIS_ONLY=ON -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer'
+          cmake --build build --parallel 2
+      - run: ctest --test-dir build --output-on-failure --timeout 120
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1
+
+  plasma:
+    name: Plasma / ${{ matrix.renderer }} / scale ${{ matrix.scale }}
+    runs-on: ubuntu-24.04
+    container: debian:13
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - renderer: opengl
+            scale: '1'
+          - renderer: software
+            scale: '1.25'
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      QT_QPA_PLATFORM: xcb
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      QT_SCALE_FACTOR: ${{ matrix.scale }}
+      LANGUAGE: en_US
+    steps:
+      - name: Install build and test dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git g++ cmake make pkg-config extra-cmake-modules \
+            qt6-base-dev qt6-declarative-dev qt6-shadertools-dev libplasma-dev \
+            libkf6config-dev libkf6coreaddons-dev libkf6package-dev libkf6kcmutils-dev libkirigami-dev \
+            libpipewire-0.3-dev libfftw3-dev plasma-workspace plasma-desktop-data \
+            qml6-module-org-kde-kirigami qml6-module-org-kde-kcmutils qml6-module-org-kde-config \
+            qml6-module-org-kde-kitemmodels qml6-module-qtquick-controls qml6-module-qtquick-layouts \
+            qml6-module-qtqml-workerscript qml6-module-qtquick-window \
+            dbus-daemon xvfb xauth libgl1-mesa-dri pipewire-bin wireplumber jq
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build --parallel 2
+      - name: Lint reusable QML components
+        run: /usr/lib/qt6/bin/qmllint package/contents/ui/RibbonView.qml package/contents/ui/AppearanceControl.qml tools/Preview.qml
+      - name: Run all tests in a private display and D-Bus session
+        shell: bash
+        run: |
+          if [[ '${{ matrix.renderer }}' == software ]]; then export QT_QUICK_BACKEND=software; fi
+          xvfb-run -a -s '-screen 0 1600x1200x24' dbus-run-session -- \
+            ctest --test-dir build --output-on-failure --timeout 180
+      - name: Isolated PipeWire routing and recovery
+        if: matrix.renderer == 'opengl'
+        run: bash tests/pipewire_integration.sh build
+      - name: Staged installation and removal
+        run: |
+          DESTDIR="$PWD/build/stage" cmake --install build
+          test -f build/stage/usr/share/plasma/plasmoids/org.kde.plasma.lumaribbon/metadata.json
+          DESTDIR="$PWD/build/stage" cmake --build build --target uninstall
+          test ! -f build/stage/usr/share/plasma/plasmoids/org.kde.plasma.lumaribbon/metadata.json
+      - name: Preserve test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-${{ matrix.renderer }}-${{ matrix.scale }}
+          path: |
+            build/Testing/Temporary/LastTest.log
+            build/evidence/
+          retention-days: 14

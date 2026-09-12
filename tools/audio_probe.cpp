@@ -29,7 +29,8 @@ int main(int argc, char **argv) {
             << " spectralBalance=" << s.features.spectralBalance << " trebleShare=" << s.features.trebleShare
             << " rate=" << s.status.rate << " channels=" << s.status.channels
             << " dropped=" << s.dropped << " expired=" << s.expired << " error=" << s.status.error << " device=" << s.status.device.toStdString()
-            << " status=" << s.status.message.toStdString() << std::endl;
+            << " status=" << s.status.message.toStdString()
+            << " detail=" << s.status.detail.simplified().toStdString() << std::endl;
         if (++samples >= seconds * 2) app.exit(args.contains("--expect-audio") && maximum < 0.03f ? 1 : 0);
     });
     timer.start(500);

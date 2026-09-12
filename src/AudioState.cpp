@@ -2,17 +2,23 @@
 #include "AudioState.h"
 #include <algorithm>
 #include <cmath>
+#include <QStringList>
 
 AudioState::AudioState(QObject *parent) : QObject(parent), engine(Luma::AudioEngine::acquire()) {
     connect(engine.get(), &Luma::AudioEngine::audioAvailable, this, &AudioState::audioAvailable);
     status.message = QStringLiteral("Connecting to the default audio output.");
     statusTimer.setInterval(1000);
     connect(&statusTimer, &QTimer::timeout, this, [this] {
-        const auto current = engine->snapshot().status;
-        if (current.message == status.message && current.device == status.device && current.error == status.error
-            && current.rate == status.rate && current.channels == status.channels) return;
+        const auto snapshot = engine->snapshot();
+        const auto &current = snapshot.status;
+        const bool changed = current.message != status.message || current.device != status.device || current.error != status.error
+            || current.rate != status.rate || current.channels != status.channels || current.detail != status.detail;
+        if (!changed && dropped == snapshot.dropped && expired == snapshot.expired) return;
         status = current;
-        Q_EMIT statusChanged();
+        dropped = snapshot.dropped;
+        expired = snapshot.expired;
+        if (changed) Q_EMIT statusChanged();
+        Q_EMIT diagnosticsChanged();
     });
     statusTimer.start();
 }
@@ -22,6 +28,17 @@ void AudioState::reportRendering(bool simple) {
     if (text == rendererStatus) return;
     rendererStatus = text;
     Q_EMIT renderingStatusChanged();
+    Q_EMIT diagnosticsChanged();
+}
+QString AudioState::diagnostics() const {
+    QStringList lines{QStringLiteral("Luma Ribbon"), status.message};
+    if (!status.device.isEmpty()) lines << status.device;
+    if (status.rate) lines << formatDescription();
+    if (!status.detail.isEmpty()) lines << status.detail;
+    if (!rendererStatus.isEmpty()) lines << rendererStatus;
+    lines << QStringLiteral("Dropped audio blocks: %1").arg(dropped)
+          << QStringLiteral("Expired audio blocks: %1").arg(expired);
+    return lines.join(QLatin1Char('\n'));
 }
 QString AudioState::formatDescription() const {
     return status.rate ? QStringLiteral("%1 Hz · %2 channels · float32").arg(status.rate).arg(status.channels) : QString();
