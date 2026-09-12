@@ -3,6 +3,7 @@
 #include <Plasma/Containment>
 #include <Plasma/Corona>
 #include <PlasmaQuick/AppletQuickItem>
+#include <PlasmaQuick/ConfigView>
 #include <KPluginMetaData>
 #include <KConfigPropertyMap>
 #include <KSharedConfig>
@@ -19,7 +20,16 @@
 #include <QSignalSpy>
 #include <QStringList>
 #include <QTemporaryDir>
+#include <QScopeGuard>
 #include <cmath>
+#include <functional>
+
+static QQuickItem *findVisualItem(QQuickItem *parent, const std::function<bool(QQuickItem *)> &matches) {
+    if (matches(parent)) return parent;
+    for (auto *child : parent->childItems())
+        if (auto *found = findVisualItem(child, matches)) return found;
+    return nullptr;
+}
 
 class TestCorona : public Plasma::Corona {
 public:
@@ -109,6 +119,19 @@ private Q_SLOTS:
         item->setExpanded(false);
         QVERIFY(!item->isExpanded());
         QTRY_VERIFY(!popupRibbon->property("renderActive").toBool());
+
+        window.requestActivate();
+        QVERIFY(QTest::qWaitForWindowActive(&window));
+        for (const auto key : {Qt::Key_Space, Qt::Key_Return, Qt::Key_Enter}) {
+            window.requestActivate();
+            QVERIFY(QTest::qWaitForWindowActive(&window));
+            item->compactRepresentationItem()->forceActiveFocus(Qt::TabFocusReason);
+            QTRY_COMPARE(window.activeFocusItem(), item->compactRepresentationItem());
+            QTest::keyClick(&window, key);
+            QTRY_VERIFY(item->isExpanded());
+            item->setExpanded(false);
+            QTRY_VERIFY(!popupRibbon->property("renderActive").toBool());
+        }
 
         QQmlComponent config(qmlEngine(item), QUrl::fromLocalFile(QStringLiteral(LUMA_SOURCE_DIR "/package/contents/ui/ConfigGeneral.qml")));
         // Plasma 6.7 passes the page title and every KConfigPropertyMap key,
@@ -341,6 +364,105 @@ private Q_SLOTS:
         form.reset();
         settingsWindow.hide();
         QTest::qWait(80);
+
+        // Use the desktop's own configuration window and button handlers.
+        // ConfigView deletes itself after hiding; also clean up on assertion failure.
+        QPointer<PlasmaQuick::ConfigView> dialog;
+        const auto closeDialog = qScopeGuard([&] { delete dialog.data(); });
+        const auto button = [&](const QString &text) {
+            return findVisualItem(dialog->contentItem(), [&](QQuickItem *candidate) {
+                return candidate->isVisible() && candidate->metaObject()->indexOfSignal("clicked()") >= 0
+                    && candidate->property("text").toString().remove(QLatin1Char('&')) == text;
+            });
+        };
+        const auto click = [&](QQuickItem *control) {
+            QTest::mouseClick(dialog, Qt::LeftButton, Qt::NoModifier,
+                control->mapToScene(QPointF(control->width() / 2, control->height() / 2)).toPoint());
+        };
+        const auto draftSlider = [&] {
+            return findVisualItem(dialog->contentItem(), [](QQuickItem *candidate) {
+                return candidate->objectName() == QStringLiteral("panelLengthSlider");
+            });
+        };
+        dialog = new PlasmaQuick::ConfigView(first);
+        dialog->init();
+        QVERIFY(dialog->rootObject());
+        dialog->show();
+        QVERIFY(QTest::qWaitForWindowExposed(dialog));
+        dialog->requestActivate();
+        QVERIFY(QTest::qWaitForWindowActive(dialog));
+        QTRY_VERIFY(draftSlider());
+        QCOMPARE(draftSlider()->property("value").toInt(), 160);
+        draftSlider()->forceActiveFocus(Qt::TabFocusReason);
+        QTest::keyClick(dialog, Qt::Key_Left);
+        QTRY_COMPARE(draftSlider()->property("value").toInt(), 152);
+        QCOMPARE(first->configuration()->value(QStringLiteral("panelLength")).toInt(), 160);
+        QTRY_VERIFY(button(QStringLiteral("Apply")) && button(QStringLiteral("Apply"))->isEnabled());
+        click(button(QStringLiteral("Apply")));
+        QTRY_COMPARE(first->configuration()->value(QStringLiteral("panelLength")).toInt(), 152);
+        QTRY_VERIFY(!button(QStringLiteral("Apply"))->isEnabled());
+        draftSlider()->forceActiveFocus(Qt::TabFocusReason);
+        QTest::keyClick(dialog, Qt::Key_Left);
+        QTRY_COMPARE(draftSlider()->property("value").toInt(), 144);
+        QVERIFY(button(QStringLiteral("Cancel")));
+        click(button(QStringLiteral("Cancel")));
+        // Plasma asks whether to apply or discard a changed draft on Cancel.
+        QObject *discardPrompt = nullptr;
+        for (auto *candidate : dialog->rootObject()->findChildren<QObject *>()) {
+            if (candidate->metaObject()->indexOfSignal("discarded()") >= 0) {
+                discardPrompt = candidate;
+                break;
+            }
+        }
+        QVERIFY(discardPrompt);
+        QTRY_VERIFY(discardPrompt->property("opened").toBool());
+        QTRY_VERIFY(button(QStringLiteral("Discard")));
+        click(button(QStringLiteral("Discard")));
+        QTRY_VERIFY(dialog.isNull());
+        QCOMPARE(first->configuration()->value(QStringLiteral("panelLength")).toInt(), 152);
+        dialog = new PlasmaQuick::ConfigView(first);
+        dialog->init();
+        dialog->show();
+        QVERIFY(QTest::qWaitForWindowExposed(dialog));
+        QTRY_VERIFY(draftSlider());
+        QCOMPARE(draftSlider()->property("value").toInt(), 152);
+        auto *diagnostics = findVisualItem(dialog->contentItem(), [](QQuickItem *candidate) {
+            return candidate->objectName() == QStringLiteral("diagnosticsText");
+        });
+        QVERIFY(diagnostics);
+        QTRY_VERIFY(diagnostics->property("text").toString().contains(QStringLiteral("Dropped audio blocks:")));
+        QVERIFY(diagnostics->property("readOnly").toBool());
+        QCOMPARE(diagnostics->property("textFormat").toInt(), int(Qt::PlainText));
+        auto *hostPage = findVisualItem(dialog->contentItem(), [](QQuickItem *candidate) {
+            return candidate->metaObject()->indexOfProperty("cfg_panelLength") >= 0;
+        });
+        QVERIFY(hostPage);
+        auto *flickable = hostPage->property("flickable").value<QObject *>();
+        QVERIFY(flickable);
+        const auto scrollToBottom = [&] {
+            flickable->setProperty("contentY", std::max(0.0,
+                flickable->property("contentHeight").toDouble() - flickable->property("height").toDouble()));
+        };
+        scrollToBottom();
+        auto *diagnosticsToggle = findVisualItem(dialog->contentItem(), [](QQuickItem *candidate) {
+            return candidate->objectName() == QStringLiteral("diagnosticsToggle");
+        });
+        QVERIFY(diagnosticsToggle);
+        click(diagnosticsToggle);
+        QTRY_VERIFY(diagnostics->isVisible());
+        QVERIFY(!button(QStringLiteral("Apply"))->isEnabled());
+        scrollToBottom();
+        const auto diagnosticsCapture = qEnvironmentVariable("LUMA_DIAGNOSTICS_CAPTURE");
+        if (!diagnosticsCapture.isEmpty()) {
+            QTest::qWait(150);
+            QVERIFY(dialog->grabWindow().save(diagnosticsCapture));
+        }
+        click(button(QStringLiteral("Cancel")));
+        QTRY_VERIFY(dialog.isNull());
+        corona.requireConfigSync();
+        saved.reparseConfiguration();
+        QCOMPARE(general.readEntry("panelLength", 0), 152);
+
         auto *second = containment->createApplet(QStringLiteral("org.kde.plasma.lumaribbon"));
         QVERIFY(second && !second->failedToLaunch());
         QCOMPARE(second->configuration()->value(QStringLiteral("panelLength")).toInt(), 120);

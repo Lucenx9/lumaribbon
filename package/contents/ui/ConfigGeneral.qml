@@ -280,5 +280,34 @@ KCM.SimpleKCM {
             Layout.maximumWidth: 360
             opacity: 0.7
         }
+        Controls.Button {
+            id: diagnosticsToggle
+            objectName: "diagnosticsToggle"
+            text: checked ? qsTr("Hide diagnostics") : qsTr("Show diagnostics")
+            checkable: true
+            visible: !!root.audio && root.audio.diagnostics !== undefined
+        }
+        Controls.TextArea {
+            id: diagnosticsText
+            objectName: "diagnosticsText"
+            Layout.fillWidth: true
+            Layout.maximumWidth: 360
+            visible: diagnosticsToggle.visible && diagnosticsToggle.checked
+            text: root.audio && root.audio.diagnostics !== undefined ? root.audio.diagnostics : ""
+            textFormat: TextEdit.PlainText
+            readOnly: true
+            selectByMouse: true
+            wrapMode: TextEdit.Wrap
+            Accessible.name: qsTr("Audio diagnostics")
+        }
+        Controls.Button {
+            text: qsTr("Copy diagnostics")
+            visible: diagnosticsText.visible
+            onClicked: {
+                diagnosticsText.selectAll();
+                diagnosticsText.copy();
+                diagnosticsText.deselect();
+            }
+        }
     }
 }
