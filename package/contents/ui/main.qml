@@ -41,7 +41,9 @@ PlasmoidItem {
         reducedMotion: Plasmoid.configuration.reducedMotion || Kirigami.Units.longDuration === 0
         forceFallback: Plasmoid.configuration.forceFallback
     }
-    compactRepresentation: Item {
+    compactRepresentation: FocusScope {
+        id: compact
+        activeFocusOnTab: true
         // Reserve a fixed length even during silence; only panel thickness can grow.
         Layout.minimumWidth: root.vertical ? 24 : root.panelLength
         Layout.preferredWidth: root.vertical ? 40 : root.panelLength
@@ -50,13 +52,27 @@ PlasmoidItem {
         Layout.preferredHeight: root.vertical ? root.panelLength : 40
         Layout.maximumHeight: root.vertical ? root.panelLength : Infinity
         ConfiguredRibbon { anchors.fill: parent; vertical: root.vertical }
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            color: "transparent"
+            border.color: Kirigami.Theme.focusColor
+            border.width: compact.activeFocus ? 1 : 0
+            radius: 3
+        }
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                if (!event.isAutoRepeat) root.expanded = !root.expanded;
+                event.accepted = true;
+            }
+        }
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             onClicked: root.expanded = !root.expanded
         }
         Accessible.role: Accessible.Button
-        Accessible.name: qsTr("Expand Luma Ribbon")
+        Accessible.name: root.expanded ? qsTr("Collapse Luma Ribbon") : qsTr("Expand Luma Ribbon")
         Accessible.onPressAction: root.expanded = !root.expanded
     }
     fullRepresentation: Item {

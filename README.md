@@ -63,6 +63,16 @@ The view and Plasma tests briefly open separate test windows. They do not change
 ctest --test-dir build -R '^(analysis|musical-response|color-response|motion)$' --output-on-failure
 ```
 
+To build just those four suites without installing Qt, KDE or PipeWire development packages:
+
+```sh
+cmake -S . -B build-analysis -DLUMA_ANALYSIS_ONLY=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-analysis --parallel
+ctest --test-dir build-analysis --output-on-failure
+```
+
+This mode needs only C++20, CMake, pkg-config, threads and FFTW. It does not build or install the widget. [CI](.github/workflows/ci.yml) runs these tests with sanitizers and builds the complete widget on Debian 13, testing both OpenGL and software rendering, fractional scaling, the actual Plasma configuration dialog and private PipeWire recovery. See the [release validation procedure](docs/release-validation.md) for hardware checks and resource measurements.
+
 For a lean build, pass `-DBUILD_TESTING=OFF -DLUMA_BUILD_PREVIEW=OFF`. Shader Tools still compiles `ribbon.frag` into `.qsb` and embeds it in the native plugin.
 
 ## Install
@@ -105,9 +115,9 @@ When upgrading a native plugin already loaded by `plasmashell`, a process can re
 | Reduced motion | Holds the broad shape and procedural phase still and removes travelling ripples and short accent motion |
 | Simple rendering | Uses a lightweight Canvas curve; automatic with software rendering or shader failure |
 
-Reduced motion also follows Plasma's disabled-animation setting. Audio and rendering status appear in the configuration dialog. The panel remains a transparent ribbon without persistent error text. During silence, the empty panel space is still clickable.
+Reduced motion also follows Plasma's disabled-animation setting. Audio and rendering status appear in the configuration dialog. **Show diagnostics** reveals a selectable report with the connection error detail and dropped/expired audio-block counters; **Copy diagnostics** copies that report. Counters belong to the shared engine's current pipeline and reset if it is recreated. The panel remains a transparent ribbon without persistent error text. During silence, the empty panel space is still clickable.
 
-The configuration dialog previews draft settings at the selected panel length and the widget's actual thickness and orientation, using the same audio source. The preview stays visible when the controls scroll. During silence it waits for audio; it does not generate a demonstration signal. **Apply** saves changes; **Cancel** discards them. Panel length affects only the compact view. **Reset appearance** restores panel length, palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom to their defaults. It leaves audio sensitivity, frame limit, reduced motion and simple rendering unchanged and still requires Apply.
+The configuration dialog previews draft settings at the selected panel length and the widget's actual thickness and orientation, using the same audio source. The preview stays visible when the controls scroll. During silence it waits for audio; it does not generate a demonstration signal. **Apply** saves changes; **Cancel** asks whether to apply or discard a changed draft. Panel length affects only the compact view. **Reset appearance** restores panel length, palette, hue, audio-reactive colors, light intensity, curvature, fullness and bloom to their defaults. It leaves audio sensitivity, frame limit, reduced motion and simple rendering unchanged and still requires Apply.
 
 Palette tints adapt to the theme's nominal background color: deeper colors on light surfaces, luminous colors on dark surfaces. This also applies to simple rendering and does not change the fade to silence.
 
