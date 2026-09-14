@@ -327,9 +327,12 @@ private Q_SLOTS:
         QVERIFY(settingsWindow.geometry().size().width() > togglePosition.x() && togglePosition.x() > 0);
         QVERIFY(settingsWindow.geometry().size().height() > togglePosition.y() && togglePosition.y() > 0);
         QTest::mouseClick(&settingsWindow, Qt::LeftButton, Qt::NoModifier, togglePosition);
-        QCOMPARE(form->property("cfg_dynamicColor").toBool(), false);
-        QTest::mouseClick(&settingsWindow, Qt::LeftButton, Qt::NoModifier, togglePosition);
-        QCOMPARE(form->property("cfg_dynamicColor").toBool(), true);
+        QTRY_COMPARE(form->property("cfg_dynamicColor").toBool(), false);
+        // Re-resolve the click position: the first toggle can shift layout or focus.
+        const auto togglePositionRetoggled =
+            colorToggle->mapToScene(QPointF(colorToggle->width() / 2, colorToggle->height() / 2)).toPoint();
+        QTest::mouseClick(&settingsWindow, Qt::LeftButton, Qt::NoModifier, togglePositionRetoggled);
+        QTRY_COMPARE(form->property("cfg_dynamicColor").toBool(), true);
         const auto settingsCapture = qEnvironmentVariable("LUMA_SETTINGS_CAPTURE");
         if (!settingsCapture.isEmpty()) {
             // A held fixture documents the controls without playing test sound.

@@ -51,6 +51,14 @@ CaptureStatus PipeWireCapture::poll() {
 class AudioStateTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void cleanup() {
+        // Reset on every exit path, including assertion failures, so a
+        // failing test cannot leak simulated capture state into the next one.
+        captureUnavailable.store(false);
+        playTone.store(false);
+        overflowNextPoll.store(false);
+        expireNextPoll.store(false);
+    }
     void unavailableRecoveryAndDiagnostics() {
         captureUnavailable.store(true);
         playTone.store(false);
@@ -87,7 +95,6 @@ private Q_SLOTS:
         engine.reset();
         QVERIFY(Clock::now() - removal < std::chrono::milliseconds(500));
         QCOMPARE(captures.load(), 0u);
-        captureUnavailable.store(false);
     }
     void coalescedWakeAndRemoval() {
         auto first = std::make_unique<AudioState>();
