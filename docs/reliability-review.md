@@ -19,7 +19,7 @@ Date: 2026-09-12. Local environment: Debian 13, Plasma libraries 6.3.5 / desktop
 | ASan and UBSan | The same eight backend suites passed with `detect_leaks=0` and `halt_on_error=1` |
 | LeakSanitizer | Not validated locally: its process inspection fails in this environment. The CI analysis job enables leak detection on its runner |
 | Rendering | View and motion-view passed with OpenGL through Mesa and with Qt software rendering at 125% |
-| Actual Plasma configuration | Passed locally with OpenGL and software rendering, including Apply/Cancel/Discard, reopening, keyboard activation and diagnostics; CI fails at the toggle assertion (`tests/test_plasma.cpp:332`) before reaching the new block — pending fix |
+| Actual Plasma configuration | Passed with OpenGL and software rendering, including Apply/Cancel/Discard, reopening, keyboard activation and diagnostics |
 | QML lint | RibbonView, AppearanceControl and Preview passed without warnings |
 | Isolated PipeWire | Eight routing/restart/silence/cleanup checkpoints passed in both normal and ASan/UBSan builds; local leak detection disabled |
 | Staged install/uninstall | Passed under the build directory |
